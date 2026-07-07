@@ -119,7 +119,7 @@ export function Splash() {
         });
         tl.fromTo(".pb-search-heading", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, tA + 0.3)
           .fromTo(".pb-field-inner", { opacity: 0, y: 30, scale: 0.95 }, { opacity: 1, y: 0, scale: 1, duration: 0.75, ease: "back.out(1.3)" }, tA + 0.35)
-          .to(".pb-glow", { opacity: 1, duration: 1.0, ease: "power2.out" }, tA + 0.3);
+          .to(".pb-glow", { opacity: 0.65, duration: 1.2, ease: "power2.out" }, tA + 0.3);
 
         // Transition B · Search hero → Docked
         const tB = 4.35;
@@ -207,7 +207,7 @@ export function Splash() {
             className="pb-glow-inner h-full w-full"
             style={{
               background:
-                "radial-gradient(55% 130% at 14% 50%, rgba(245,158,11,0.60), transparent 62%), radial-gradient(48% 150% at 42% 55%, rgba(126,58,212,0.55), transparent 62%), radial-gradient(45% 150% at 70% 48%, rgba(70,110,255,0.45), transparent 62%), radial-gradient(42% 140% at 90% 52%, rgba(232,64,160,0.40), transparent 62%)",
+                "radial-gradient(60% 140% at 16% 50%, rgba(228,170,95,0.20), transparent 66%), radial-gradient(52% 160% at 44% 55%, rgba(140,108,196,0.17), transparent 66%), radial-gradient(50% 160% at 70% 48%, rgba(108,138,214,0.15), transparent 66%), radial-gradient(46% 150% at 90% 52%, rgba(198,120,168,0.13), transparent 66%)",
             }}
           />
         </div>
