@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import gsap from "gsap";
 import { Logo } from "./Logo";
-import { SearchField } from "./SearchField";
+import { SearchBar } from "./SearchBar";
 
 /**
  * Six material spheres. Each has three keyframes — one per stage of the
@@ -220,7 +220,7 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
           />
         </div>
         <div className="pb-field-inner relative z-10 opacity-0" style={{ width: FIELD.hero.w, maxWidth: "100%" }}>
-          <SearchField />
+          <SearchBar />
         </div>
       </div>
     </div>
