@@ -1,0 +1,14 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="searchImage">
+<path id="Icon" d="M18.3346 11.5833V14.1667C18.3346 16.0335 18.3346 16.9669 17.9713 17.68C17.6517 18.3072 17.1418 18.8171 16.5146 19.1367C15.8016 19.5 14.8681 19.5 13.0013 19.5H7.0013C5.13446 19.5 4.20104 19.5 3.488 19.1367C2.86079 18.8171 2.35086 18.3072 2.03128 17.68C1.66797 16.9669 1.66797 16.0335 1.66797 14.1667V9.83333C1.66797 7.96649 1.66797 7.03307 2.03128 6.32003C2.35086 5.69282 2.86079 5.18289 3.488 4.86331C4.20104 4.5 5.13446 4.5 7.0013 4.5H10.418M13.3346 12C13.3346 13.8409 11.8423 15.3333 10.0013 15.3333C8.16035 15.3333 6.66797 13.8409 6.66797 12C6.66797 10.1591 8.16035 8.66667 10.0013 8.66667C11.8423 8.66667 13.3346 10.1591 13.3346 12Z" stroke="var(--stroke-0, white)" stroke-linecap="round" stroke-linejoin="round"/>
+<g id="search-lg" clip-path="url(#clip0_0_66)">
+<path id="Accent" d="M21 7L19.8334 5.83333" stroke="var(--stroke-0, #F59E0B)" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Icon_2" d="M17.8333 6.66667C19.3981 6.66667 20.6667 5.39814 20.6667 3.83333C20.6667 2.26853 19.3981 1 17.8333 1C16.2685 1 15 2.26853 15 3.83333C15 5.39814 16.2685 6.66667 17.8333 6.66667Z" stroke="var(--stroke-0, #F59E0B)" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_0_66">
+<rect width="8" height="8" fill="white" transform="translate(14)"/>
+</clipPath>
+</defs>
+</svg>

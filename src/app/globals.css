@@ -23,6 +23,14 @@
   box-sizing: border-box;
 }
 
+/* Horizontal scroll rows (category tiles, product cards) with no visible bar. */
+.pb-home-scroll {
+  scrollbar-width: none;
+}
+.pb-home-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 html,
 body {
   margin: 0;
