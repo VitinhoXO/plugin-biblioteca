@@ -7,8 +7,8 @@ import { SearchBar } from "../SearchBar";
  */
 export function Header() {
   return (
-    <header className="pb-home-header sticky top-0 z-40 flex h-[80px] w-full items-center justify-center bg-black">
-      <div className="w-[880px]">
+    <header className="pb-home-header pointer-events-none sticky top-0 z-40 flex h-[80px] w-full items-center justify-center">
+      <div className="pointer-events-auto w-[880px]">
         <SearchBar />
       </div>
     </header>

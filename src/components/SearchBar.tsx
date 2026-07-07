@@ -23,8 +23,16 @@ export function SearchBar() {
       {/* logo + premium badge */}
       <div className="flex shrink-0 items-center gap-[8px]">
         <Logo className="h-[32px] w-[27.749px] text-white" />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/home/header/tagplan.svg" alt="Experiência Premium" className="h-[22px] w-[146.521px]" />
+        {/* badge is a 146.5×22 slot; the SVG (155×30, with shadow bleed) sits at
+            its natural aspect offset -4,-2 so the pill lines up exactly */}
+        <div className="relative h-[22px] w-[146.521px] shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/home/header/tagplan.svg"
+            alt="Experiência Premium"
+            className="absolute left-[-4px] top-[-2px] h-[30px] w-[155px] max-w-none"
+          />
+        </div>
       </div>
 
       {/* input */}
