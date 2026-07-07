@@ -10,14 +10,10 @@ import { Logo } from "./Logo";
 export function WelcomeGate({ onStart, closing = false }: { onStart: () => void; closing?: boolean }) {
   return (
     <div className={`pb-gate fixed inset-0 z-[60] flex items-center justify-center${closing ? " pb-gate-closing" : ""}`}>
-      <div
-        className="pb-gate-scrim absolute inset-0"
-        style={{
-          background: "rgba(6,6,8,0.5)",
-          backdropFilter: "blur(22px)",
-          WebkitBackdropFilter: "blur(22px)",
-        }}
-      />
+      {/* dark scrim only — the blur is applied to the home itself (see
+          .pb-home-blurred) because backdrop-filter doesn't reliably blur across
+          the home's sticky / z-indexed layers */}
+      <div className="pb-gate-scrim absolute inset-0" style={{ background: "rgba(6,7,10,0.42)" }} />
 
       <div className="pb-gate-content relative flex flex-col items-center gap-[28px] px-6 text-center">
         <Logo className="h-[40px] w-[34.69px] text-white" />

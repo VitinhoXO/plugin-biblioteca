@@ -53,7 +53,9 @@ export function Experience() {
 
   return (
     <div ref={rootRef} className="relative bg-black">
-      <Home />
+      <div className={`pb-home-stage${gateOpen && !gateClosing ? " pb-home-blurred" : ""}`}>
+        <Home />
+      </div>
       {gateOpen && <WelcomeGate onStart={handleStart} closing={gateClosing} />}
       {!splashGone && (
         <div className="pb-splash-overlay fixed inset-0 z-50">

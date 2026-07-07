@@ -35,6 +35,20 @@
  * The blur is applied inline on the scrim (Tailwind v4's CSS pipeline drops a
  * plain `backdrop-filter` declaration here). Fade in/out is pure CSS so it
  * never depends on GSAP selector timing. */
+/* The home blurs behind the gate (filter on the home itself — reliable across
+ * its sticky/z-indexed layers, unlike backdrop-filter). */
+.pb-home-stage {
+  transition: filter 0.55s ease;
+}
+.pb-home-stage.pb-home-blurred {
+  filter: blur(20px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pb-home-stage {
+    transition: none;
+  }
+}
+
 .pb-gate {
   animation: pb-gate-in 0.6s ease both;
 }
