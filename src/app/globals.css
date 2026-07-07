@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+/* =============================================================
+ * Biblioteca Plugin — splashscreen tokens (Compasso DS)
+ * Figma: Compasso-DS / Biblioteca Plugin > Inicio
+ * ============================================================= */
+:root {
+  --bg-black: #000000;
+  --tile-bg: rgba(255, 255, 255, 0.08);
+  --text-on-dark: #ffffff;
+  --text-tertiary: #d4d4d4;
+  --amber-500: #f59e0b;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+}
+
+@theme inline {
+  --font-sans: var(--font-manrope);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-black);
+  color: var(--text-on-dark);
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Living colour glow behind the search field: a slow drift + breathe with a
+ * hue sweep so the amber → violet → blue → magenta blend keeps shifting.
+ * Runs on an inner layer so it never fights GSAP's opacity fade on .pb-glow. */
+@keyframes pb-aurora {
+  0% {
+    transform: translateX(-3%) scale(1);
+    filter: blur(46px) hue-rotate(0deg) saturate(1.05);
+  }
+  50% {
+    transform: translateX(3%) scale(1.12);
+    filter: blur(54px) hue-rotate(38deg) saturate(1.2);
+  }
+  100% {
+    transform: translateX(-3%) scale(1);
+    filter: blur(46px) hue-rotate(0deg) saturate(1.05);
+  }
+}
+
+.pb-glow-inner {
+  filter: blur(46px);
+  animation: pb-aurora 9s ease-in-out infinite;
+  will-change: transform, filter;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pb-glow-inner {
+    animation: none;
+  }
+}
