@@ -1,5 +1,5 @@
-import { Splash } from "@/components/Splash";
+import { Experience } from "@/components/Experience";
 
 export default function Page() {
-  return <Splash />;
+  return <Experience />;
 }

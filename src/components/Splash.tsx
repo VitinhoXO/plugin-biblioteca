@@ -29,9 +29,11 @@ const FIELD = {
   docked: { top: 1.39, w: 880 },
 };
 
-export function Splash() {
+export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const playedRef = useRef(false);
+  const doneRef = useRef(onComplete);
+  doneRef.current = onComplete;
 
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -97,7 +99,10 @@ export function Splash() {
         // ---- the sequence ----
         const tl = gsap.timeline({
           defaults: { ease: "power2.out" },
-          onComplete: () => (playedRef.current = true),
+          onComplete: () => {
+            playedRef.current = true;
+            doneRef.current?.();
+          },
         });
 
         // Stage 0 · Welcome reveal
