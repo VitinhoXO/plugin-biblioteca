@@ -119,16 +119,19 @@ export function Splash() {
         });
         tl.fromTo(".pb-search-heading", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, tA + 0.3)
           .fromTo(".pb-field-inner", { opacity: 0, y: 30, scale: 0.95 }, { opacity: 1, y: 0, scale: 1, duration: 0.75, ease: "back.out(1.3)" }, tA + 0.35)
-          .to(".pb-glow", { opacity: 0.65, duration: 1.2, ease: "power2.out" }, tA + 0.3);
+          .to(".pb-glow", { opacity: 0.9, duration: 1.2, ease: "power2.out" }, tA + 0.3);
 
-        // Transition B · Search hero → Docked
+        // Transition B · Search hero → Docked. Everything else clears out —
+        // heading, logo, glow and the spheres dissolve outward — leaving only
+        // the docked search bar on black.
         const tB = 4.35;
         tl.to(".pb-search-heading", { opacity: 0, y: -30, duration: 0.5, ease: "power2.in" }, tB)
           .to(".pb-top-logo", { opacity: 0, duration: 0.45 }, tB)
+          .to(".pb-glow", { opacity: 0, duration: 0.8, ease: "power2.in" }, tB)
           .to(".pb-field-wrap", { y: dockedY, duration: 1.1, ease: "expo.inOut" }, tB)
           .to(".pb-field-inner", { width: FIELD.docked.w, duration: 1.1, ease: "expo.inOut" }, tB);
         sphereEls.forEach((el, i) => {
-          tl.to(el, { x: geom[i].s[2].x, y: geom[i].s[2].y, scale: geom[i].s[2].scale, duration: 1.35, ease: "power3.inOut" }, tB);
+          tl.to(el, { x: geom[i].s[2].x, y: geom[i].s[2].y, scale: geom[i].s[2].scale * 0.9, opacity: 0, duration: 1.1, ease: "power2.in" }, tB);
         });
 
         // On resize (after the intro has played) or reduced motion, skip to rest.
@@ -207,7 +210,7 @@ export function Splash() {
             className="pb-glow-inner h-full w-full"
             style={{
               background:
-                "radial-gradient(60% 140% at 16% 50%, rgba(228,170,95,0.20), transparent 66%), radial-gradient(52% 160% at 44% 55%, rgba(140,108,196,0.17), transparent 66%), radial-gradient(50% 160% at 70% 48%, rgba(108,138,214,0.15), transparent 66%), radial-gradient(46% 150% at 90% 52%, rgba(198,120,168,0.13), transparent 66%)",
+                "radial-gradient(58% 140% at 16% 50%, rgba(236,172,80,0.42), transparent 64%), radial-gradient(50% 160% at 44% 55%, rgba(140,100,205,0.36), transparent 64%), radial-gradient(48% 160% at 70% 48%, rgba(100,135,225,0.32), transparent 64%), radial-gradient(45% 150% at 90% 52%, rgba(210,110,170,0.28), transparent 64%)",
             }}
           />
         </div>

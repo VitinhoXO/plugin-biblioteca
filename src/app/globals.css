@@ -39,22 +39,22 @@ body {
  * Runs on an inner layer so it never fights GSAP's opacity fade on .pb-glow. */
 @keyframes pb-aurora {
   0% {
-    transform: translateX(-1.5%) scale(1);
-    filter: blur(60px) hue-rotate(-6deg) saturate(0.85);
+    transform: translateX(-3%) scale(1);
+    filter: blur(52px) hue-rotate(-10deg) saturate(1);
   }
   50% {
-    transform: translateX(1.5%) scale(1.04);
-    filter: blur(66px) hue-rotate(8deg) saturate(0.9);
+    transform: translateX(3%) scale(1.08);
+    filter: blur(58px) hue-rotate(20deg) saturate(1.1);
   }
   100% {
-    transform: translateX(-1.5%) scale(1);
-    filter: blur(60px) hue-rotate(-6deg) saturate(0.85);
+    transform: translateX(-3%) scale(1);
+    filter: blur(52px) hue-rotate(-10deg) saturate(1);
   }
 }
 
 .pb-glow-inner {
-  filter: blur(60px) saturate(0.85);
-  animation: pb-aurora 14s ease-in-out infinite;
+  filter: blur(52px) saturate(1);
+  animation: pb-aurora 8s ease-in-out infinite;
   will-change: transform, filter;
 }
 
