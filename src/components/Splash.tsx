@@ -224,27 +224,14 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
          (autoAlpha): o fantasma borrado das outras etapas morre, e a
          entrada/saída conversa com a névoa do fundo. */
 
-      // 2. PREPARANDO (18819:27760)
-      tl.to(
-        ".pb2-stage-prep",
-        { autoAlpha: 1, duration: 0.3, ease: "power2.out" },
-        "reveal+=0.3",
-      );
-      wordsIn(tl, ".pb2-stage-prep", "reveal+=0.35");
-      wordsOut(tl, ".pb2-stage-prep .pb2-title", "+=1.5");
-      tl.to(
-        ".pb2-stage-prep",
-        { autoAlpha: 0, duration: 0.3, ease: "power2.in" },
-        ">-0.15",
-      );
-
-      // 3. BEM-VINDO (18819:27743): título, depois o subtítulo.
+      // 2. BEM-VINDO (18819:27743) — primeiro (ordem do Victor, 03/08):
+      //    título, depois o subtítulo.
       tl.to(
         ".pb2-stage-welcome",
         { autoAlpha: 1, duration: 0.3, ease: "power2.out" },
-        "+=0.05",
+        "reveal+=0.3",
       );
-      wordsIn(tl, ".pb2-stage-welcome .pb2-title", "<0.05");
+      wordsIn(tl, ".pb2-stage-welcome .pb2-title", "reveal+=0.35");
       tl.to(
         ".pb2-stage-welcome .pb2-sub",
         { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
@@ -262,6 +249,20 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
         "<0.06",
       ).to(
         ".pb2-stage-welcome",
+        { autoAlpha: 0, duration: 0.3, ease: "power2.in" },
+        ">-0.15",
+      );
+
+      // 3. PREPARANDO (18819:27760)
+      tl.to(
+        ".pb2-stage-prep",
+        { autoAlpha: 1, duration: 0.3, ease: "power2.out" },
+        "+=0.05",
+      );
+      wordsIn(tl, ".pb2-stage-prep", "<0.05");
+      wordsOut(tl, ".pb2-stage-prep .pb2-title", "+=1.5");
+      tl.to(
+        ".pb2-stage-prep",
         { autoAlpha: 0, duration: 0.3, ease: "power2.in" },
         ">-0.15",
       );
