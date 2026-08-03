@@ -5,84 +5,59 @@ import gsap from "gsap";
 import { Logo } from "./Logo";
 
 /**
- * Splash v2 — redesign dos nós 18902:63949 → 18902:63901 → 18819:27760 →
- * 18819:27780 → 18819:27743.
+ * Onboarding de primeiro acesso — nós 18902:63949/63901 (logo) →
+ * 18819:27760 (Preparando) → 18819:27743 (Bem-vindo) → 18819:27780
+ * (Vamos começar, o ÚLTIMO step) → mergulho → biblioteca com o Entrar
+ * TRAVADO (a biblioteca só existe logado).
  *
- * Sequência:
- *  1. LOGO    — chapa amarela #ffc400 com o logo GIGANTE (estourando a tela,
- *               como no nó) encolhendo até virar selo; a chapa desvanece
- *               revelando o túnel.
- *  2. PREP    — preto com o TÚNEL de materiais (cards de produto flutuando em
- *               direção à câmera, com depth of field: desfoca de leve o que
- *               está longe e, mais forte, o que vai chegando PERTO — a
- *               leitura da nuvem do rodapé do collection-site) + "Preparando
- *               sua experiência..." em text-appear por palavra.
- *  3. CHOICE  — "Vamos começar" + dois cards; "Primeiro acesso" carrega o
- *               MESMO efeito do card de produto selecionado da biblioteca
- *               (anel em degradê + glow respirando).
- *  4. WELCOME — "Bem-vindo(a)!"; na saída os materiais ACELERAM contra a
- *               tela (escala + blur estourando) e o texto vem junto — o
- *               mergulho para dentro da biblioteca.
- *
- * O túnel é DOM + GSAP ticker (sem WebGL): cada card tem um z virtual [0..1]
- * que vira escala + afastamento radial + blur. Barato, e o mesmo modelo
- * serve a saída (z disparado além do plano da tela).
+ * O campo de materiais é a FITA do collection-site (MaterialsCloud):
+ * esferas cruas derivando de um lado ao outro por um vale raso na metade
+ * de baixo, com NÉVOA por profundidade e um resto de blur só no que está
+ * quase na tela — o centro fica limpo pro texto, sem borrão.
  */
 
-/* As MESMAS esferas de material do túnel do site (public/products de lá):
-   é a "image 570" dos nós — bola de material em canvas quase cheio. */
 const PRODUCT_IMGS = Array.from(
   { length: 10 },
   (_, i) => `/products/product-${i + 1}.webp`,
 );
 
-/* Slots radiais: ângulo (graus, 0 = direita), distância base (% do menor
-   lado) e tamanho base (px @1440). Espalhados pelas bordas — o miolo é do
-   texto, como nos nós (produtos de 91 a 212px encostados nos cantos). */
-const SLOTS: { angle: number; dist: number; size: number; z0: number }[] = [
-  { angle: 208, dist: 34, size: 190, z0: 0.62 },
-  { angle: 24, dist: 38, size: 170, z0: 0.45 },
-  { angle: 336, dist: 36, size: 205, z0: 0.75 },
-  { angle: 155, dist: 40, size: 150, z0: 0.3 },
-  { angle: 262, dist: 38, size: 165, z0: 0.55 },
-  { angle: 82, dist: 40, size: 140, z0: 0.2 },
-  { angle: 118, dist: 44, size: 120, z0: 0.68 },
-  { angle: 296, dist: 46, size: 130, z0: 0.1 },
-  { angle: 45, dist: 50, size: 110, z0: 0.85 },
-  { angle: 190, dist: 52, size: 100, z0: 0.02 },
+/* Itens da fita: fase inicial u, profundidade dz [0..1], desvio dy (px @864)
+   e tamanho base. Os três últimos são os "altos": longe, pequenos, no topo —
+   o resto vive no vale de baixo, como no site. */
+const ITEMS: { u0: number; dz: number; dy: number; size: number; top?: boolean }[] = [
+  { u0: 0.05, dz: 0.85, dy: 40, size: 210 },
+  { u0: 0.18, dz: 0.35, dy: -20, size: 150 },
+  { u0: 0.3, dz: 0.65, dy: 20, size: 185 },
+  { u0: 0.42, dz: 0.2, dy: -35, size: 125 },
+  { u0: 0.55, dz: 0.9, dy: 55, size: 220 },
+  { u0: 0.66, dz: 0.45, dy: 0, size: 160 },
+  { u0: 0.78, dz: 0.7, dy: 30, size: 190 },
+  { u0: 0.9, dz: 0.3, dy: -15, size: 140 },
+  { u0: 0.98, dz: 0.55, dy: 12, size: 170 },
+  { u0: 0.12, dz: 0.12, dy: 0, size: 95, top: true },
+  { u0: 0.5, dz: 0.2, dy: 24, size: 110, top: true },
+  { u0: 0.82, dz: 0.08, dy: -12, size: 85, top: true },
 ];
 
-/* DOF: foco em z≈0.55; longe desfoca de leve, PERTO desfoca forte (é o
-   "depth of field nos que vão ficando mais próximos" do pedido). */
-const FOCUS_Z = 0.55;
-const RESPAWN_Z = 1.18;
-
-type CardSim = {
+type ItemSim = {
   el: HTMLElement;
-  angle: number;
-  dist: number;
-  z: number;
+  u: number;
+  dz: number;
+  dy: number;
   speed: number;
+  top: boolean;
 };
 
-/* DOF discreto, na pegada do site (a nuvem lá usa NÉVOA, não gaussiana
-   pesada): perto desfoca um pouco, longe quase nada — e a profundidade é
-   contada principalmente pela opacidade (fog) e pela escala. */
-function blurFor(z: number): number {
-  if (z > FOCUS_Z) return (z - FOCUS_Z) * 9;
-  return (FOCUS_Z - z) * 3;
+/* Fade nas bordas da travessia, como o edgeFade do site. */
+function edgeFade(u: number): number {
+  const inF = Math.min(1, Math.max(0, u / 0.16));
+  const outF = Math.min(1, Math.max(0, (1 - u) / 0.16));
+  const t = Math.min(inF, outF);
+  return t * t * (3 - 2 * t); // smoothstep
 }
 
-function opacityFor(z: number): number {
-  const fadeIn = Math.min(1, z / 0.1);
-  const fadeOut = Math.min(1, Math.max(0, (RESPAWN_Z - z) / 0.14));
-  /* Névoa: fundo mais apagado, aproximando acende — o fog do site. */
-  const fog = 0.45 + 0.55 * Math.min(1, z / 0.8);
-  return Math.min(fadeIn, fadeOut) * fog;
-}
-
-/** Título quebrado por palavra — máscara + miolo, pro text-appear subir de
- * dentro da linha com um resto de blur. */
+/** Título quebrado por palavra — máscara + miolo, o text-appear sobe de
+ * dentro da linha com um resto de blur. Estado escondido vem do GSAP. */
 function Words({ text, className = "" }: { text: string; className?: string }) {
   return (
     <span className={`pb2-words ${className}`} aria-label={text}>
@@ -97,32 +72,33 @@ function Words({ text, className = "" }: { text: string; className?: string }) {
 
 export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const simsRef = useRef<CardSim[]>([]);
+  const simsRef = useRef<ItemSim[]>([]);
   const tickerRef = useRef<((time: number, dt: number) => void) | null>(null);
   const leavingRef = useRef(false);
   const [stage, setStage] = useState<"intro" | "choice">("intro");
   const doneRef = useRef(onComplete);
   doneRef.current = onComplete;
 
-  /* Um passo da simulação: z avança devagar em direção à câmera; passou do
-     plano da tela, renasce no fundo. Escala, afastamento radial, blur e
-     opacidade derivam todos do z. */
-  const applySim = useCallback((sim: CardSim) => {
+  /* Um passo da fita: u atravessa a tela; posição vem do vale (ou da faixa
+     alta), escala/névoa/blur vêm da profundidade dz. */
+  const applySim = useCallback((sim: ItemSim) => {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const minSide = Math.min(vw, vh);
-    const rad = (sim.angle * Math.PI) / 180;
-    const spread = sim.dist + sim.z * 34; // afasta do centro conforme aproxima
-    const x = Math.cos(rad) * ((spread / 100) * minSide) * (vw / minSide) * 0.72;
-    const y = Math.sin(rad) * ((spread / 100) * minSide) * 0.8;
-    const scale = 0.34 + sim.z * 1.18;
+    const x = (sim.u - 0.5) * (vw + 420);
+    const valley = sim.top
+      ? -vh * (0.3 + 0.05 * Math.sin(Math.PI * sim.u))
+      : vh * (0.16 + 0.15 * Math.sin(Math.PI * sim.u)) + sim.dz * vh * 0.1;
+    const y = valley + sim.dy;
+    const scale = 0.38 + sim.dz * 1.12;
+    const fog = 0.32 + 0.68 * sim.dz;
+    const blur = sim.dz > 0.78 ? (sim.dz - 0.78) * 26 : 0;
     gsap.set(sim.el, {
       x,
       y,
       scale,
-      opacity: opacityFor(sim.z),
-      filter: `blur(${blurFor(sim.z).toFixed(1)}px)`,
-      zIndex: Math.round(sim.z * 40),
+      opacity: edgeFade(sim.u) * fog,
+      filter: blur > 0.5 ? `blur(${blur.toFixed(1)}px)` : "none",
+      zIndex: Math.round(sim.dz * 40),
     });
   }, []);
 
@@ -134,23 +110,21 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
     const cardEls = gsap.utils.toArray<HTMLElement>(".pb2-card", root);
     simsRef.current = cardEls.map((el, i) => ({
       el,
-      angle: SLOTS[i].angle,
-      dist: SLOTS[i].dist,
-      z: SLOTS[i].z0,
-      speed: 0.028 + (i % 4) * 0.009, // deriva LENTA, cada um no seu passo
+      u: ITEMS[i].u0,
+      dz: ITEMS[i].dz,
+      dy: ITEMS[i].dy,
+      top: !!ITEMS[i].top,
+      speed: 0.011 + (i % 5) * 0.0035, // travessia de ~45s a ~90s, como o site
     }));
 
     const ctx = gsap.context(() => {
-      // Estado inicial do campo: invisível (a chapa amarela cobre tudo).
       simsRef.current.forEach(applySim);
       gsap.set(".pb2-field", { opacity: 0 });
-      /* Esconder as palavras AQUI, não no CSS: translateY(115%) na folha e
-         yPercent no tween são pistas diferentes — o tween "rodava" e a
-         palavra ficava presa embaixo, borrada. */
+      /* Esconder as palavras AQUI, não no CSS: translateY(%) na folha e
+         yPercent no tween são pistas diferentes e a palavra trava. */
       gsap.set(".pb2-wi", { yPercent: 115, filter: "blur(8px)" });
 
       if (reduce) {
-        // Sem movimento: pula direto pra escolha, campo estático visível.
         gsap.set(".pb2-logo-layer", { display: "none" });
         gsap.set(".pb2-field", { opacity: 1 });
         gsap.set(".pb2-stage-choice", { opacity: 1, pointerEvents: "auto" });
@@ -163,18 +137,20 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
       const ticker = (_t: number, dtMs: number) => {
         const dt = Math.min(dtMs, 64) / 1000;
         for (const sim of simsRef.current) {
-          if (leavingRef.current) continue; // a saída assume os tweens
-          sim.z += sim.speed * dt;
-          if (sim.z >= RESPAWN_Z) sim.z -= RESPAWN_Z;
+          if (leavingRef.current) continue;
+          sim.u += sim.speed * dt;
+          if (sim.u > 1.02) {
+            sim.u -= 1.04;
+            sim.dz = 0.1 + Math.abs(Math.sin(sim.u * 97)) * 0.8;
+          }
           applySim(sim);
         }
       };
       tickerRef.current = ticker;
       gsap.ticker.add(ticker);
 
-      /* Text-appear FASEADO (pedido do Victor): cada bloco entra na sua vez,
-         palavra a palavra — nada de tela inteira de uma vez. */
-      const showWords = (
+      /* Text-appear FASEADO: cada bloco na sua vez, palavra a palavra. */
+      const wordsIn = (
         tl: gsap.core.Timeline,
         scope: string,
         at: gsap.Position,
@@ -191,16 +167,28 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
           at,
         );
       };
+      const wordsOut = (
+        tl: gsap.core.Timeline,
+        scope: string,
+        at: gsap.Position,
+      ) => {
+        tl.to(
+          `${scope} .pb2-wi`,
+          {
+            yPercent: -115,
+            filter: "blur(6px)",
+            duration: 0.5,
+            stagger: 0.04,
+            ease: "power2.in",
+          },
+          at,
+        );
+      };
 
-      // ——— Timeline mestre até a tela de escolha ———
       const tl = gsap.timeline();
 
-      // 1. LOGO: selo pequeno (nó 18902:63901) que CRESCE até o traço preto
-      //    engolir a tela (o nó 18902:63949 é o meio do caminho) — a origem
-      //    do scale fica DENTRO do traço, então quando ele cobre tudo o
-      //    corte pro fundo preto é invisível.
+      // 1. LOGO: selo pequeno que CRESCE até o traço preto engolir a tela.
       tl.set(".pb2-logo", { scale: 1, transformOrigin: "50% 12%" })
-        // pulso de presença do selo antes de crescer
         .to(".pb2-logo", {
           scale: 1.12,
           duration: 0.5,
@@ -208,10 +196,8 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
           delay: 0.3,
         })
         .to(".pb2-logo", { scale: 1, duration: 0.4, ease: "sine.inOut" })
-        // o mergulho pra DENTRO do logo
         .to(".pb2-logo", { scale: 60, duration: 1.25, ease: "power3.in" })
         .addLabel("reveal", ">-0.02")
-        // a tela já está toda preta (o traço) — a chapa some sem ninguém ver
         .set(".pb2-logo-layer", { display: "none" }, "reveal")
         .to(
           ".pb2-field",
@@ -219,23 +205,28 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
           "reveal",
         );
 
-      // 3. PREP: "Preparando sua experiência..." aparece e segura.
-      showWords(tl, ".pb2-stage-prep", "reveal+=0.35");
+      // 2. PREPARANDO (18819:27760)
+      wordsIn(tl, ".pb2-stage-prep", "reveal+=0.35");
+      wordsOut(tl, ".pb2-stage-prep", "+=1.5");
+
+      // 3. BEM-VINDO (18819:27743): título, depois o subtítulo.
+      wordsIn(tl, ".pb2-stage-welcome .pb2-title", "+=0.1");
       tl.to(
-        ".pb2-stage-prep .pb2-wi",
-        {
-          yPercent: -115,
-          filter: "blur(6px)",
-          duration: 0.55,
-          stagger: 0.045,
-          ease: "power2.in",
-        },
-        "+=1.5",
+        ".pb2-stage-welcome .pb2-sub",
+        { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
+        "-=0.3",
+      );
+      wordsOut(tl, ".pb2-stage-welcome .pb2-title", "+=1.7");
+      tl.to(
+        ".pb2-stage-welcome .pb2-sub",
+        { opacity: 0, y: -12, duration: 0.4, ease: "power2.in" },
+        "<",
       );
 
-      // 4. CHOICE em três fases: título → subtítulo → cards.
-      showWords(tl, ".pb2-stage-choice .pb2-title", "+=0.1");
-      showWords(tl, ".pb2-stage-choice .pb2-subtitle", "-=0.35");
+      // 4. VAMOS COMEÇAR (18819:27780) — o ÚLTIMO step: título → subtítulo
+      //    → cards, e espera o clique.
+      wordsIn(tl, ".pb2-stage-choice .pb2-title", "+=0.1");
+      wordsIn(tl, ".pb2-stage-choice .pb2-subtitle", "-=0.35");
       tl.to(
         ".pb2-stage-choice .pb2-rise",
         { opacity: 1, y: 0, duration: 0.65, stagger: 0.16, ease: "power3.out" },
@@ -245,8 +236,6 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
         gsap.set(".pb2-stage-choice", { pointerEvents: "auto" });
       });
 
-      /* Mesmo truque do splash v1: em dev o timeline fica acessível pra
-         depuração/preview headless (rAF pausado não anda timeline). */
       if (process.env.NODE_ENV !== "production") {
         (window as unknown as { __pb2Tl?: gsap.core.Timeline }).__pb2Tl = tl;
       }
@@ -258,8 +247,8 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
     };
   }, [applySim]);
 
-  /* Clique em qualquer card: escolha sai, Bem-vindo entra, e a SAÍDA — os
-     materiais aceleram CONTRA a tela e tudo mergulha pra dentro da home. */
+  /* Clique em qualquer card = MERGULHO: os materiais aceleram contra a
+     tela e a biblioteca abre por baixo com o Entrar travado. */
   const handleChoose = useCallback(() => {
     const root = rootRef.current;
     if (!root || leavingRef.current) return;
@@ -275,8 +264,6 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
         (window as unknown as { __pb2ChooseTl?: gsap.core.Timeline }).__pb2ChooseTl = tl;
       }
 
-      /* A escolha é o ÚLTIMO step (Victor, 03/08): sem Bem-vindo — o clique
-         já dispara o mergulho pra biblioteca, que abre com o Entrar travado. */
       gsap.set(".pb2-stage-choice", { pointerEvents: "none" });
       tl.to(".pb2-stage-choice .pb2-wi", {
         yPercent: -115,
@@ -292,31 +279,29 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
         )
         .addLabel("dive", "-=0.05");
 
-      // Materiais vindo NA TELA: além do plano, blur e escala estourando.
       leavingRef.current = true;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
       simsRef.current.forEach((sim, i) => {
-        const rad = (sim.angle * Math.PI) / 180;
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const minSide = Math.min(vw, vh);
-        const boost = sim.dist + 150;
+        const x = (sim.u - 0.5) * (vw + 420);
+        const y = sim.top
+          ? -vh * 0.55
+          : vh * (0.2 + 0.15 * Math.sin(Math.PI * sim.u)) + sim.dy;
         tl.to(
           sim.el,
           {
-            x:
-              Math.cos(rad) * ((boost / 100) * minSide) * (vw / minSide) * 0.72,
-            y: Math.sin(rad) * ((boost / 100) * minSide) * 0.8,
-            scale: 3.6 + (i % 3) * 0.8,
+            x: x * 2.1,
+            y: y * 2.2,
+            scale: 3.4 + sim.dz * 1.6,
             opacity: 0,
-            filter: "blur(26px)",
+            filter: "blur(24px)",
             duration: 0.85,
             ease: "power3.in",
           },
-          `dive+=${(i % 5) * 0.05}`,
+          `dive+=${(i % 5) * 0.045}`,
         );
       });
 
-      // O fundo abre no meio do mergulho — a biblioteca aparece por baixo.
       tl.to(
         ".pb2-root-bg",
         { opacity: 0, duration: 0.5, ease: "power2.inOut" },
@@ -329,17 +314,17 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
     <div ref={rootRef} className="pb2-root fixed inset-0 overflow-hidden">
       <div className="pb2-root-bg absolute inset-0 bg-black" />
 
-      {/* Túnel de materiais (DOM, z virtual → escala/afastamento/DOF). */}
+      {/* Fita de materiais (modelo do MaterialsCloud do site). */}
       <div className="pb2-field absolute inset-0" aria-hidden>
-        {SLOTS.map((slot, i) => (
+        {ITEMS.map((item, i) => (
           <div
             key={i}
             className="pb2-card absolute left-1/2 top-1/2"
             style={{
-              width: `${slot.size}px`,
-              height: `${slot.size}px`,
-              marginLeft: `${-slot.size / 2}px`,
-              marginTop: `${-slot.size / 2}px`,
+              width: `${item.size}px`,
+              height: `${item.size}px`,
+              marginLeft: `${-item.size / 2}px`,
+              marginTop: `${-item.size / 2}px`,
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -348,75 +333,49 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
         ))}
       </div>
 
-      {/* PREP — nó 18819:27760 */}
+      {/* PREPARANDO — nó 18819:27760 */}
       <div className="pb2-stage pb2-stage-prep">
         <h1 className="pb2-title">
           <Words text="Preparando sua experiência..." />
         </h1>
       </div>
 
-      {/* CHOICE — nó 18819:27780 */}
+      {/* BEM-VINDO — nó 18819:27743 */}
+      <div className="pb2-stage pb2-stage-welcome">
+        <div className="flex w-[430px] max-w-[calc(100vw-48px)] flex-col gap-[16px]">
+          <h1 className="pb2-title">
+            <Words text="Bem-vindo(a)!" />
+          </h1>
+          <p className="pb2-subtitle pb2-sub">
+            A partir de agora, sua vida profissional nunca mais será a mesma.
+          </p>
+        </div>
+      </div>
+
+      {/* TUDO PRONTO — nó 18819:27780 (o último step: sem escolha de
+          cadastrar/logar; um único Começar que mergulha pro Entrar travado) */}
       <div
         className="pb2-stage pb2-stage-choice"
         style={{ pointerEvents: "none" }}
       >
-        <div className="flex w-[392px] max-w-[calc(100vw-48px)] flex-col gap-[56px]">
+        <div className="flex w-[450px] max-w-[calc(100vw-48px)] flex-col gap-[56px]">
           <div className="flex flex-col gap-[8px]">
             <h1 className="pb2-title">
-              <Words text="Vamos começar" />
+              <Words text="Tudo pronto!" />
             </h1>
             <p className="pb2-subtitle">
-              <Words text="Selecione como deseja entrar:" />
+              <Words text="Busque em mais de 22.000 produtos prontos para especificar" />
             </p>
           </div>
-          <div className="flex flex-col gap-[12px]">
-            {/* Primeiro acesso — o card com o efeito do produto SELECIONADO
-                da biblioteca: anel em degradê + glow que respira (o nó traz
-                o stroke em GRADIENT_LINEAR). */}
-            <button
-              type="button"
-              onClick={handleChoose}
-              disabled={stage !== "choice"}
-              className="pb2-option pb2-option-first pb2-rise"
-            >
-              <span className="pb2-option-icon" aria-hidden>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path
-                    d="M8 3.3v9.4M3.3 8h9.4"
-                    stroke="#ffc400"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </span>
-              <span className="pb2-option-texts">
-                <span className="pb2-option-title">Primeiro acesso</span>
-                <span className="pb2-option-sub">Criar uma conta</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={handleChoose}
-              disabled={stage !== "choice"}
-              className="pb2-option pb2-rise"
-            >
-              <span className="pb2-option-icon" aria-hidden>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path
-                    d="M6 3.5 10.5 8 6 12.5"
-                    stroke="#ffffff"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
-              <span className="pb2-option-texts">
-                <span className="pb2-option-title">Já tenho conta</span>
-                <span className="pb2-option-sub">Entrar</span>
-              </span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleChoose}
+            disabled={stage !== "choice"}
+            className="pb2-start pb2-rise"
+          >
+            <span className="pb2-start-glow" aria-hidden />
+            <span>Começar</span>
+          </button>
         </div>
       </div>
 

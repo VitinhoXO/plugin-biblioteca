@@ -243,21 +243,19 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 80px;
 }
-.pb2-option-texts {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+/* Linha unica do no 18819:27780: [icone] titulo ..... acao (os dois textos
+   brancos, 16px, pesos 600/400). */
 .pb2-option-title {
   font-weight: 600;
   font-size: 16px;
   line-height: 22px;
 }
-.pb2-option-sub {
+.pb2-option-action {
+  margin-left: auto;
   font-weight: 400;
-  font-size: 14px;
-  line-height: 20px;
-  color: rgba(255, 255, 255, 0.64);
+  font-size: 16px;
+  line-height: 22px;
+  color: #ffffff;
 }
 
 /* "Primeiro acesso" = o efeito do card de produto SELECIONADO da
@@ -316,6 +314,68 @@ body {
     transform: none;
   }
   .pb2-sub {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Botao Comecar do ultimo step (no 18819:27780, familia buttonDownload):
+   chapa amarela r12, 44 de altura, com a elipse de brilho branca 80%
+   desfocada varrendo por dentro. */
+.pb2-start {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: #ffc400;
+  color: #000000;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(18px);
+  transition: background 0.15s ease;
+}
+.pb2-start:hover {
+  background: #ffcd26;
+}
+.pb2-start > span:last-child {
+  position: relative;
+  z-index: 1;
+}
+.pb2-start-glow {
+  position: absolute;
+  top: 50%;
+  left: -30%;
+  width: 150px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  filter: blur(22px);
+  transform: translateY(-50%);
+  animation: pb2-sweep 3.2s ease-in-out infinite;
+}
+@keyframes pb2-sweep {
+  0%,
+  100% {
+    left: -30%;
+    opacity: 0.55;
+  }
+  50% {
+    left: 75%;
+    opacity: 0.95;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pb2-start-glow {
+    animation: none;
+  }
+  .pb2-start {
     opacity: 1;
     transform: none;
   }
