@@ -29,7 +29,13 @@ type SketchupBridge = {
   getFirstAccess?: (isFirst: boolean) => void;
 };
 
-export function Experience() {
+export function Experience({
+  /** Rota de teste (/onboarding-teste, noindex): sempre mostra o onboarding
+   * e nunca marca como visto — replay infinito pra avaliação. */
+  forceOnboarding = false,
+}: {
+  forceOnboarding?: boolean;
+} = {}) {
   /* null = resolvendo (nada renderiza por cima; o fundo é preto) */
   const [firstAccess, setFirstAccess] = useState<boolean | null>(null);
   const [reveal, setReveal] = useState(false);
@@ -37,6 +43,10 @@ export function Experience() {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (forceOnboarding) {
+      setFirstAccess(true);
+      return;
+    }
     const params = new URLSearchParams(window.location.search);
     if (params.get("onboarding") === "1") {
       setFirstAccess(true);
@@ -79,10 +89,12 @@ export function Experience() {
   }, [firstAccess]);
 
   const handleSplashComplete = () => {
-    try {
-      window.localStorage.setItem(ONBOARDED_KEY, "1");
-    } catch {
-      /* storage indisponível (webview restrito): só não persiste */
+    if (!forceOnboarding) {
+      try {
+        window.localStorage.setItem(ONBOARDED_KEY, "1");
+      } catch {
+        /* storage indisponível (webview restrito): só não persiste */
+      }
     }
     setReveal(true);
   };
