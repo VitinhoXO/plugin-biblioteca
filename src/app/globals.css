@@ -151,26 +151,17 @@ body {
 
 /* ═══ Splash v2 (nós 18819/18902) ═══════════════════════════════════════ */
 
-/* Cards do túnel: moldura de vidro do nó (branco 8%, radius 16, respiro
-   interno) — o blur/escala/posição são todos do GSAP. */
+/* Materiais do túnel IGUAL AO SITE (Victor, 03/08): a esfera crua, sem
+   moldura nenhuma — o PNG tem alfa e flutua sozinho, como na nuvem do
+   rodapé do collection-site. */
 .pb2-card {
-  padding: 5.5%;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.08);
   pointer-events: none;
-}
-.pb2-card {
-  overflow: hidden;
 }
 .pb2-card img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  border-radius: 10px;
+  object-fit: contain;
   display: block;
-  /* A esfera vive num canvas com ~15% de respiro: o zoom leve faz a bola
-     preencher o card, como a image 570 dos nós. */
-  transform: scale(1.45);
 }
 
 /* Palcos de texto: centralizados, um por vez. */

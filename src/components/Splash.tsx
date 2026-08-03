@@ -65,15 +65,20 @@ type CardSim = {
   speed: number;
 };
 
+/* DOF discreto, na pegada do site (a nuvem lá usa NÉVOA, não gaussiana
+   pesada): perto desfoca um pouco, longe quase nada — e a profundidade é
+   contada principalmente pela opacidade (fog) e pela escala. */
 function blurFor(z: number): number {
-  if (z > FOCUS_Z) return (z - FOCUS_Z) * 20;
-  return (FOCUS_Z - z) * 7;
+  if (z > FOCUS_Z) return (z - FOCUS_Z) * 9;
+  return (FOCUS_Z - z) * 3;
 }
 
 function opacityFor(z: number): number {
   const fadeIn = Math.min(1, z / 0.1);
   const fadeOut = Math.min(1, Math.max(0, (RESPAWN_Z - z) / 0.14));
-  return Math.min(fadeIn, fadeOut);
+  /* Névoa: fundo mais apagado, aproximando acende — o fog do site. */
+  const fog = 0.45 + 0.55 * Math.min(1, z / 0.8);
+  return Math.min(fadeIn, fadeOut) * fog;
 }
 
 /** Título quebrado por palavra — máscara + miolo, pro text-appear subir de
