@@ -275,6 +275,8 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
         (window as unknown as { __pb2ChooseTl?: gsap.core.Timeline }).__pb2ChooseTl = tl;
       }
 
+      /* A escolha é o ÚLTIMO step (Victor, 03/08): sem Bem-vindo — o clique
+         já dispara o mergulho pra biblioteca, que abre com o Entrar travado. */
       gsap.set(".pb2-stage-choice", { pointerEvents: "none" });
       tl.to(".pb2-stage-choice .pb2-wi", {
         yPercent: -115,
@@ -288,24 +290,7 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
           { opacity: 0, y: 14, duration: 0.4, stagger: 0.05, ease: "power2.in" },
           "<",
         )
-        .to(
-          ".pb2-stage-welcome .pb2-wi",
-          {
-            yPercent: 0,
-            filter: "blur(0px)",
-            duration: 0.75,
-            stagger: 0.07,
-            ease: "power3.out",
-          },
-          "-=0.1",
-        )
-        .to(
-          ".pb2-stage-welcome .pb2-sub",
-          { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
-          "<0.2",
-        )
-        // segura o Bem-vindo na tela antes do mergulho
-        .addLabel("dive", "+=1.35");
+        .addLabel("dive", "-=0.05");
 
       // Materiais vindo NA TELA: além do plano, blur e escala estourando.
       leavingRef.current = true;
@@ -331,21 +316,11 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
         );
       });
 
-      // O texto mergulha junto: cresce em direção ao usuário e desfoca.
+      // O fundo abre no meio do mergulho — a biblioteca aparece por baixo.
       tl.to(
-        ".pb2-stage-welcome",
-        {
-          scale: 1.35,
-          opacity: 0,
-          filter: "blur(14px)",
-          duration: 0.7,
-          ease: "power3.in",
-        },
-        "dive+=0.1",
-      ).to(
         ".pb2-root-bg",
         { opacity: 0, duration: 0.5, ease: "power2.inOut" },
-        "dive+=0.45",
+        "dive+=0.35",
       );
     }, root);
   }, []);
@@ -442,18 +417,6 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
               </span>
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* WELCOME — nó 18819:27743 */}
-      <div className="pb2-stage pb2-stage-welcome">
-        <div className="flex w-[430px] max-w-[calc(100vw-48px)] flex-col items-center gap-[16px] text-center">
-          <h1 className="pb2-title">
-            <Words text="Bem-vindo(a)!" className="pb2-words-center" />
-          </h1>
-          <p className="pb2-subtitle pb2-sub">
-            A partir de agora, sua vida profissional nunca mais será a mesma.
-          </p>
         </div>
       </div>
 

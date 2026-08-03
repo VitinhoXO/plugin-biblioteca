@@ -4,15 +4,15 @@ import { useLayoutEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { Splash } from "./Splash";
 import { Home } from "./home/Home";
+import { LockedLogin } from "./LockedLogin";
 
 /**
- * Splash v2 → live home.
+ * Onboarding → biblioteca com o Entrar TRAVADO.
  *
- * O splash novo (logo amarelo → túnel → escolha → Bem-vindo) já termina no
- * MERGULHO — os materiais aceleram contra a tela e o fundo do splash abre.
- * Aqui só resta a home entrar por baixo enquanto o overlay desvanece; o
- * WelcomeGate antigo ("Sua biblioteca está pronta") morreu com o redesign:
- * o Bem-vindo agora vive dentro do próprio splash.
+ * O onboarding termina no mergulho (a escolha É o último step). A home entra
+ * por baixo já BORRADA, com o gate de login por cima — sem X e sem fechar:
+ * a biblioteca só existe logado (decisão de 03/08). O desborramento fica
+ * para quando o login real acontecer.
  */
 export function Experience() {
   const [reveal, setReveal] = useState(false);
@@ -37,9 +37,10 @@ export function Experience() {
 
   return (
     <div ref={rootRef} className="relative bg-black">
-      <div className="pb-home-stage">
+      <div className={`pb-home-stage${reveal ? " pb-home-blurred" : ""}`}>
         <Home />
       </div>
+      {reveal && <LockedLogin />}
       {!splashGone && (
         <div className="pb-splash-overlay fixed inset-0 z-50">
           <Splash onComplete={() => setReveal(true)} />
