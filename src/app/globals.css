@@ -164,11 +164,12 @@ body {
   display: block;
 }
 
-/* Palcos de texto: centralizados, um por vez. */
+/* Palcos de texto: centralizados, um por vez, SEMPRE por cima do campo de
+   materiais (os cards levam z-index por profundidade, até ~72). */
 .pb2-stage {
   position: absolute;
   inset: 0;
-  z-index: 50;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -180,6 +181,7 @@ body {
   font-weight: 600;
   font-size: 24px;
   line-height: 26px;
+  text-align: center;
 }
 .pb2-subtitle {
   margin: 0;
@@ -187,6 +189,7 @@ body {
   font-weight: 400;
   font-size: 16px;
   line-height: 18px;
+  text-align: center;
 }
 
 /* Text-appear: cada palavra sobe de dentro da própria linha (máscara) com um
@@ -194,6 +197,7 @@ body {
 .pb2-words {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   column-gap: 0.32em;
   row-gap: 2px;
 }

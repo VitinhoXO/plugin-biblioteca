@@ -21,36 +21,43 @@ const PRODUCT_IMGS = Array.from(
   (_, i) => `/products/product-${i + 1}.webp`,
 );
 
-/* Itens da fita, na densidade do SITE (a nuvem de lá tem ~32 itens sempre em
-   cena — pouca gente deixava a tela vazia): 22 itens espalhados de forma
-   uniforme pela travessia, tamanhos contidos (a fita do site é discreta, sem
-   bolão), profundidade variada pra névoa trabalhar. */
-const ITEMS = Array.from({ length: 22 }, (_, i) => {
-  const top = i >= 17;
-  const u0 = (i * 0.37 + 0.05) % 1; // espalhamento áureo: sem buracos
-  const dz = top
-    ? 0.08 + (i % 3) * 0.09
-    : 0.15 + (((i * 7) % 10) / 10) * 0.75;
-  const dy = ((i * 13) % 60) - 30;
-  const size = top ? 64 + (i % 3) * 16 : 76 + Math.round(dz * 88); // 76–164
-  return { u0, dz, dy, size, top };
+/* O FUNIL do site, de verdade: perspectiva de câmera com ponto de fuga no
+   centro. Cada material vive no mundo 3D (wx, wy fixos num anel em volta do
+   eixo; wz vindo do FUNDO na direção da tela). A projeção faz o resto:
+   longe = pequeno, apagado e perto do centro; aproximando = cresce, acende
+   e ABRE pras bordas até passar pela câmera. Sem blur — profundidade é
+   névoa + escala, como no site. */
+const NEAR = 2.2; // além daqui o item passou pela câmera
+const FAR = 26;
+const FOG_NEAR = 8; // aceso total
+const FOG_FAR = 24; // nasce apagado
+const PROJ = 10; // escala 1 quando wz = PROJ
+
+const GOLDEN = 137.508;
+
+const ITEMS = Array.from({ length: 36 }, (_, i) => {
+  const angle = ((i * GOLDEN) % 360) * (Math.PI / 180);
+  const radius = 2.8 + (((i * 53) % 100) / 100) * 6.0; // anel 2.8–8.8: centro livre
+  return {
+    wx: Math.cos(angle) * radius,
+    wy: Math.sin(angle) * radius, // achatamento fica na projeção
+    wz0: NEAR + (((i * 29) % 100) / 100) * (FAR - NEAR),
+    size: 96 + (((i * 17) % 100) / 100) * 84, // 96–180 @ escala 1
+    speed: 1.15 + (((i * 11) % 100) / 100) * 0.85, // ~12–20s do fundo à tela
+  };
 });
 
 type ItemSim = {
   el: HTMLElement;
-  u: number;
-  dz: number;
-  dy: number;
+  wx: number;
+  wy: number;
+  wz: number;
   speed: number;
-  top: boolean;
 };
 
-/* Fade nas bordas da travessia, como o edgeFade do site. */
-function edgeFade(u: number): number {
-  const inF = Math.min(1, Math.max(0, u / 0.16));
-  const outF = Math.min(1, Math.max(0, (1 - u) / 0.16));
-  const t = Math.min(inF, outF);
-  return t * t * (3 - 2 * t); // smoothstep
+function smooth(t: number): number {
+  const c = Math.min(1, Math.max(0, t));
+  return c * c * (3 - 2 * c);
 }
 
 /** Título quebrado por palavra — máscara + miolo, o text-appear sobe de
@@ -76,28 +83,31 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
   const doneRef = useRef(onComplete);
   doneRef.current = onComplete;
 
-  /* Um passo da fita: u atravessa a tela; posição vem do vale (ou da faixa
-     alta), escala/névoa/blur vêm da profundidade dz. */
+  /* Projeção de câmera: k = PROJ/wz manda em posição, escala e ordem.
+     A névoa acende conforme aproxima; passando da câmera, desvanece. */
   const applySim = useCallback((sim: ItemSim) => {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const x = (sim.u - 0.5) * (vw + 420);
-    const valley = sim.top
-      ? -vh * (0.3 + 0.05 * Math.sin(Math.PI * sim.u))
-      : vh * (0.16 + 0.15 * Math.sin(Math.PI * sim.u)) + sim.dz * vh * 0.1;
-    const y = valley + sim.dy;
-    const scale = 0.38 + sim.dz * 1.12;
-    const fog = 0.32 + 0.68 * sim.dz;
-    /* O site conta profundidade com NÉVOA, não com gaussiana: o blur aqui é
-       um sussurro só no que está quase furando a tela (máx ~4px). */
-    const blur = sim.dz > 0.85 ? (sim.dz - 0.85) * 28 : 0;
+    const k = PROJ / sim.wz;
+    const unit = Math.min(vw, vh) / 14; // 1 unidade de mundo em px
+    /* FURO central: o texto mora no meio, então nenhum material chega a
+       menos de (holeX, holeY) do centro — o deslocamento é ao longo do
+       próprio ângulo, o anel continua circular e o mergulho abre pelas
+       bordas em vez de atravessar o botão. */
+    const holeX = Math.min(vw * 0.26, 330);
+    const holeY = Math.min(vh * 0.3, 260);
+    const ang = Math.atan2(sim.wy, sim.wx);
+    const radial = Math.hypot(sim.wx, sim.wy) * k * unit;
+    const x = Math.cos(ang) * (holeX + radial);
+    const y = Math.sin(ang) * (holeY + radial * 0.78);
+    const fog = smooth((FOG_FAR - sim.wz) / (FOG_FAR - FOG_NEAR));
+    const nearFade = sim.wz < 3.4 ? smooth((sim.wz - NEAR) / (3.4 - NEAR)) : 1;
     gsap.set(sim.el, {
       x,
       y,
-      scale,
-      opacity: edgeFade(sim.u) * fog,
-      filter: blur > 0.5 ? `blur(${blur.toFixed(1)}px)` : "none",
-      zIndex: Math.round(sim.dz * 40),
+      scale: k,
+      opacity: fog * nearFade,
+      zIndex: Math.round((FAR - sim.wz) * 3),
     });
   }, []);
 
@@ -109,11 +119,10 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
     const cardEls = gsap.utils.toArray<HTMLElement>(".pb2-card", root);
     simsRef.current = cardEls.map((el, i) => ({
       el,
-      u: ITEMS[i].u0,
-      dz: ITEMS[i].dz,
-      dy: ITEMS[i].dy,
-      top: !!ITEMS[i].top,
-      speed: 0.011 + (i % 5) * 0.0035, // travessia de ~45s a ~90s, como o site
+      wx: ITEMS[i].wx,
+      wy: ITEMS[i].wy,
+      wz: ITEMS[i].wz0,
+      speed: ITEMS[i].speed,
     }));
 
     const ctx = gsap.context(() => {
@@ -144,11 +153,8 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
         const dt = Math.min(dtMs, 64) / 1000;
         for (const sim of simsRef.current) {
           if (leavingRef.current) continue;
-          sim.u += sim.speed * dt;
-          if (sim.u > 1.02) {
-            sim.u -= 1.04;
-            sim.dz = 0.1 + Math.abs(Math.sin(sim.u * 97)) * 0.8;
-          }
+          sim.wz -= sim.speed * dt; // vindo NA DIREÇÃO da tela
+          if (sim.wz < NEAR) sim.wz += FAR - NEAR; // renasce no fundo do funil
           applySim(sim);
         }
       };
@@ -173,18 +179,21 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
           at,
         );
       };
+      /* Text-out = ZOOM IN seco: o bloco vem contra a tela e apaga, como os
+         materiais no mergulho. Sem blur — virava borrão (Victor, 03/08).
+         Zoom no BLOCO, não nas palavras — a máscara do .pb2-w cortaria. */
       const wordsOut = (
         tl: gsap.core.Timeline,
         scope: string,
         at: gsap.Position,
       ) => {
         tl.to(
-          `${scope} .pb2-wi`,
+          scope,
           {
-            yPercent: -115,
-            filter: "blur(6px)",
-            duration: 0.5,
-            stagger: 0.04,
+            scale: 1.75,
+            opacity: 0,
+            transformOrigin: "50% 50%",
+            duration: 0.45,
             ease: "power2.in",
           },
           at,
@@ -222,7 +231,7 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
         "reveal+=0.3",
       );
       wordsIn(tl, ".pb2-stage-prep", "reveal+=0.35");
-      wordsOut(tl, ".pb2-stage-prep", "+=1.5");
+      wordsOut(tl, ".pb2-stage-prep .pb2-title", "+=1.5");
       tl.to(
         ".pb2-stage-prep",
         { autoAlpha: 0, duration: 0.3, ease: "power2.in" },
@@ -244,8 +253,13 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
       wordsOut(tl, ".pb2-stage-welcome .pb2-title", "+=1.7");
       tl.to(
         ".pb2-stage-welcome .pb2-sub",
-        { opacity: 0, y: -12, duration: 0.4, ease: "power2.in" },
-        "<",
+        {
+          opacity: 0,
+          scale: 1.5,
+          duration: 0.4,
+          ease: "power2.in",
+        },
+        "<0.06",
       ).to(
         ".pb2-stage-welcome",
         { autoAlpha: 0, duration: 0.3, ease: "power2.in" },
@@ -298,38 +312,26 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
       }
 
       gsap.set(".pb2-stage-choice", { pointerEvents: "none" });
-      tl.to(".pb2-stage-choice .pb2-wi", {
-        yPercent: -115,
-        filter: "blur(6px)",
+      /* O texto sai em ZOOM IN seco — mergulha junto com os materiais. */
+      tl.to(".pb2-stage-choice", {
+        scale: 1.7,
+        autoAlpha: 0,
+        transformOrigin: "50% 50%",
         duration: 0.45,
-        stagger: 0.03,
         ease: "power2.in",
-      })
-        .to(
-          ".pb2-stage-choice .pb2-rise",
-          { opacity: 0, y: 14, duration: 0.4, stagger: 0.05, ease: "power2.in" },
-          "<",
-        )
-        .addLabel("dive", "-=0.05");
+      }).addLabel("dive", "-=0.32");
 
+      /* MERGULHO: acelera o wz de cada material até passar pela câmera — a
+         mesma projeção do idle faz o resto (cresce, abre e some na borda). */
       leavingRef.current = true;
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
       simsRef.current.forEach((sim, i) => {
-        const x = (sim.u - 0.5) * (vw + 420);
-        const y = sim.top
-          ? -vh * 0.55
-          : vh * (0.2 + 0.15 * Math.sin(Math.PI * sim.u)) + sim.dy;
         tl.to(
-          sim.el,
+          sim,
           {
-            x: x * 2.1,
-            y: y * 2.2,
-            scale: 3.4 + sim.dz * 1.6,
-            opacity: 0,
-            filter: "blur(24px)",
-            duration: 0.85,
-            ease: "power3.in",
+            wz: NEAR * 0.55,
+            duration: 0.8,
+            ease: "power2.in",
+            onUpdate: () => applySim(sim),
           },
           `dive+=${(i % 5) * 0.045}`,
         );
@@ -375,7 +377,7 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
 
       {/* BEM-VINDO — nó 18819:27743 */}
       <div className="pb2-stage pb2-stage-welcome">
-        <div className="flex w-[430px] max-w-[calc(100vw-48px)] flex-col gap-[16px]">
+        <div className="flex w-[430px] max-w-[calc(100vw-48px)] flex-col items-center gap-[16px] text-center">
           <h1 className="pb2-title">
             <Words text="Bem-vindo(a)!" />
           </h1>
@@ -391,8 +393,8 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
         className="pb2-stage pb2-stage-choice"
         style={{ pointerEvents: "none" }}
       >
-        <div className="flex w-[450px] max-w-[calc(100vw-48px)] flex-col gap-[56px]">
-          <div className="flex flex-col gap-[8px]">
+        <div className="flex w-[450px] max-w-[calc(100vw-48px)] flex-col items-center gap-[56px] text-center">
+          <div className="flex w-full flex-col items-center gap-[8px]">
             <h1 className="pb2-title">
               <Words text="Tudo pronto!" />
             </h1>
@@ -404,7 +406,7 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
             type="button"
             onClick={handleChoose}
             disabled={stage !== "choice"}
-            className="pb2-start pb2-rise"
+            className="pb2-start pb2-rise self-stretch"
           >
             <span className="pb2-start-glow" aria-hidden />
             <span>Começar</span>
