@@ -200,6 +200,13 @@ body {
 .pb2-words-center {
   justify-content: center;
 }
+/* Preparando: linha unica CENTRADA (estava alinhada ao bloco, nao a tela). */
+.pb2-stage-prep .pb2-words {
+  justify-content: center;
+}
+.pb2-stage-prep .pb2-title {
+  text-align: center;
+}
 .pb2-w {
   display: inline-block;
   overflow: hidden;
@@ -378,5 +385,133 @@ body {
   .pb2-start {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* ── Ilustracao do gate (porte CSS do EffectPanel do AuthModal real) ─── */
+.pbg-effect {
+  min-height: 426px;
+  background:
+    radial-gradient(240px 150px at 20% 4%, rgba(255, 196, 0, 0.12), transparent 70%),
+    radial-gradient(260px 170px at 90% 92%, rgba(255, 196, 0, 0.09), transparent 70%),
+    #0a0a0a;
+}
+.pbg-globe-slot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 50;
+  display: block;
+  width: 230px;
+  height: 230px;
+  margin: -115px 0 0 -115px;
+  filter: drop-shadow(0 18px 48px rgba(0, 0, 0, 0.6));
+}
+.pbg-globe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: pbg-girar 35s linear infinite;
+}
+@keyframes pbg-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Orbita eliptica com oclusao: frente no arco de baixo (z60), atras no de
+   cima (z40) — os flips de z em degraus 25%/25.01% e 74.99%/75%. */
+.pbg-orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  animation: pbg-orbitar 28s linear infinite;
+}
+@keyframes pbg-orbitar {
+  0% {
+    transform: translate(-50%, -50%) translate(0px, 66px) scale(1);
+    z-index: 60;
+  }
+  12.5% {
+    transform: translate(-50%, -50%) translate(117px, 47px) scale(1);
+    z-index: 60;
+  }
+  25% {
+    transform: translate(-50%, -50%) translate(165px, 0px) scale(0.98);
+    z-index: 60;
+  }
+  25.01% {
+    transform: translate(-50%, -50%) translate(165px, 0px) scale(0.98);
+    z-index: 40;
+  }
+  37.5% {
+    transform: translate(-50%, -50%) translate(117px, -47px) scale(0.8);
+    z-index: 40;
+  }
+  50% {
+    transform: translate(-50%, -50%) translate(0px, -66px) scale(0.75);
+    z-index: 40;
+  }
+  62.5% {
+    transform: translate(-50%, -50%) translate(-117px, -47px) scale(0.8);
+    z-index: 40;
+  }
+  74.99% {
+    transform: translate(-50%, -50%) translate(-165px, 0px) scale(0.98);
+    z-index: 40;
+  }
+  75% {
+    transform: translate(-50%, -50%) translate(-165px, 0px) scale(0.98);
+    z-index: 60;
+  }
+  87.5% {
+    transform: translate(-50%, -50%) translate(-117px, 47px) scale(1);
+    z-index: 60;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(0px, 66px) scale(1);
+    z-index: 60;
+  }
+}
+.pbg-map-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 90px;
+  padding: 7px 7px 10px;
+  border-radius: 8px;
+  background: rgba(58, 58, 58, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.pbg-map-card img {
+  width: 100%;
+  height: 75px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+.pbg-map-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pbg-map-texts strong {
+  color: #ffffff;
+  font-size: 10px;
+  line-height: 12px;
+  font-weight: 500;
+}
+.pbg-map-texts em {
+  color: #bfbfbf;
+  font-size: 10px;
+  line-height: 12px;
+  font-weight: 300;
+  font-style: normal;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pbg-globe,
+  .pbg-orbit {
+    animation: none;
   }
 }

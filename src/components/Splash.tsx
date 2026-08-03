@@ -21,23 +21,20 @@ const PRODUCT_IMGS = Array.from(
   (_, i) => `/products/product-${i + 1}.webp`,
 );
 
-/* Itens da fita: fase inicial u, profundidade dz [0..1], desvio dy (px @864)
-   e tamanho base. Os três últimos são os "altos": longe, pequenos, no topo —
-   o resto vive no vale de baixo, como no site. */
-const ITEMS: { u0: number; dz: number; dy: number; size: number; top?: boolean }[] = [
-  { u0: 0.05, dz: 0.85, dy: 40, size: 210 },
-  { u0: 0.18, dz: 0.35, dy: -20, size: 150 },
-  { u0: 0.3, dz: 0.65, dy: 20, size: 185 },
-  { u0: 0.42, dz: 0.2, dy: -35, size: 125 },
-  { u0: 0.55, dz: 0.9, dy: 55, size: 220 },
-  { u0: 0.66, dz: 0.45, dy: 0, size: 160 },
-  { u0: 0.78, dz: 0.7, dy: 30, size: 190 },
-  { u0: 0.9, dz: 0.3, dy: -15, size: 140 },
-  { u0: 0.98, dz: 0.55, dy: 12, size: 170 },
-  { u0: 0.12, dz: 0.12, dy: 0, size: 95, top: true },
-  { u0: 0.5, dz: 0.2, dy: 24, size: 110, top: true },
-  { u0: 0.82, dz: 0.08, dy: -12, size: 85, top: true },
-];
+/* Itens da fita, na densidade do SITE (a nuvem de lá tem ~32 itens sempre em
+   cena — pouca gente deixava a tela vazia): 22 itens espalhados de forma
+   uniforme pela travessia, tamanhos contidos (a fita do site é discreta, sem
+   bolão), profundidade variada pra névoa trabalhar. */
+const ITEMS = Array.from({ length: 22 }, (_, i) => {
+  const top = i >= 17;
+  const u0 = (i * 0.37 + 0.05) % 1; // espalhamento áureo: sem buracos
+  const dz = top
+    ? 0.08 + (i % 3) * 0.09
+    : 0.15 + (((i * 7) % 10) / 10) * 0.75;
+  const dy = ((i * 13) % 60) - 30;
+  const size = top ? 64 + (i % 3) * 16 : 76 + Math.round(dz * 88); // 76–164
+  return { u0, dz, dy, size, top };
+});
 
 type ItemSim = {
   el: HTMLElement;
@@ -91,7 +88,9 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
     const y = valley + sim.dy;
     const scale = 0.38 + sim.dz * 1.12;
     const fog = 0.32 + 0.68 * sim.dz;
-    const blur = sim.dz > 0.78 ? (sim.dz - 0.78) * 26 : 0;
+    /* O site conta profundidade com NÉVOA, não com gaussiana: o blur aqui é
+       um sussurro só no que está quase furando a tela (máx ~4px). */
+    const blur = sim.dz > 0.85 ? (sim.dz - 0.85) * 28 : 0;
     gsap.set(sim.el, {
       x,
       y,
@@ -123,11 +122,18 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
       /* Esconder as palavras AQUI, não no CSS: translateY(%) na folha e
          yPercent no tween são pistas diferentes e a palavra trava. */
       gsap.set(".pb2-wi", { yPercent: 115, filter: "blur(8px)" });
+      /* Palco INTEIRO some quando não é a vez dele (autoAlpha): era o
+         "borrão no fundo" — as palavras das outras etapas, borradas e
+         empilhadas atrás do texto ativo (print do Victor, 03/08). */
+      gsap.set(".pb2-stage", { autoAlpha: 0 });
 
       if (reduce) {
         gsap.set(".pb2-logo-layer", { display: "none" });
         gsap.set(".pb2-field", { opacity: 1 });
-        gsap.set(".pb2-stage-choice", { opacity: 1, pointerEvents: "auto" });
+        gsap.set(".pb2-stage-choice", {
+          autoAlpha: 1,
+          pointerEvents: "auto",
+        });
         gsap.set(".pb2-stage-choice .pb2-wi", { yPercent: 0, filter: "none" });
         gsap.set(".pb2-stage-choice .pb2-rise", { opacity: 1, y: 0 });
         setStage("choice");
@@ -205,12 +211,31 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
           "reveal",
         );
 
+      /* Cada palco ACENDE na sua vez e APAGA por inteiro na troca
+         (autoAlpha): o fantasma borrado das outras etapas morre, e a
+         entrada/saída conversa com a névoa do fundo. */
+
       // 2. PREPARANDO (18819:27760)
+      tl.to(
+        ".pb2-stage-prep",
+        { autoAlpha: 1, duration: 0.3, ease: "power2.out" },
+        "reveal+=0.3",
+      );
       wordsIn(tl, ".pb2-stage-prep", "reveal+=0.35");
       wordsOut(tl, ".pb2-stage-prep", "+=1.5");
+      tl.to(
+        ".pb2-stage-prep",
+        { autoAlpha: 0, duration: 0.3, ease: "power2.in" },
+        ">-0.15",
+      );
 
       // 3. BEM-VINDO (18819:27743): título, depois o subtítulo.
-      wordsIn(tl, ".pb2-stage-welcome .pb2-title", "+=0.1");
+      tl.to(
+        ".pb2-stage-welcome",
+        { autoAlpha: 1, duration: 0.3, ease: "power2.out" },
+        "+=0.05",
+      );
+      wordsIn(tl, ".pb2-stage-welcome .pb2-title", "<0.05");
       tl.to(
         ".pb2-stage-welcome .pb2-sub",
         { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
@@ -221,11 +246,19 @@ export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
         ".pb2-stage-welcome .pb2-sub",
         { opacity: 0, y: -12, duration: 0.4, ease: "power2.in" },
         "<",
+      ).to(
+        ".pb2-stage-welcome",
+        { autoAlpha: 0, duration: 0.3, ease: "power2.in" },
+        ">-0.15",
       );
 
-      // 4. VAMOS COMEÇAR (18819:27780) — o ÚLTIMO step: título → subtítulo
-      //    → cards, e espera o clique.
-      wordsIn(tl, ".pb2-stage-choice .pb2-title", "+=0.1");
+      // 4. TUDO PRONTO (18819:27780) — o ÚLTIMO step.
+      tl.to(
+        ".pb2-stage-choice",
+        { autoAlpha: 1, duration: 0.3, ease: "power2.out" },
+        "+=0.05",
+      );
+      wordsIn(tl, ".pb2-stage-choice .pb2-title", "<0.05");
       wordsIn(tl, ".pb2-stage-choice .pb2-subtitle", "-=0.35");
       tl.to(
         ".pb2-stage-choice .pb2-rise",
