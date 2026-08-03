@@ -1,227 +1,460 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { Logo } from "./Logo";
-import { SearchBar } from "./SearchBar";
 
 /**
- * Six material spheres. Each has three keyframes — one per stage of the
- * sequence — as [centerX %, centerY %, diameter vw] relative to the
- * 1440×864 Figma frame. Across the stages they drift outward and grow,
- * mirroring Figma nodes 17520:48186 → 17637:48523 → 17637:48575.
+ * Splash v2 — redesign dos nós 18902:63949 → 18902:63901 → 18819:27760 →
+ * 18819:27780 → 18819:27743.
+ *
+ * Sequência:
+ *  1. LOGO    — chapa amarela #ffc400 com o logo GIGANTE (estourando a tela,
+ *               como no nó) encolhendo até virar selo; a chapa desvanece
+ *               revelando o túnel.
+ *  2. PREP    — preto com o TÚNEL de materiais (cards de produto flutuando em
+ *               direção à câmera, com depth of field: desfoca de leve o que
+ *               está longe e, mais forte, o que vai chegando PERTO — a
+ *               leitura da nuvem do rodapé do collection-site) + "Preparando
+ *               sua experiência..." em text-appear por palavra.
+ *  3. CHOICE  — "Vamos começar" + dois cards; "Primeiro acesso" carrega o
+ *               MESMO efeito do card de produto selecionado da biblioteca
+ *               (anel em degradê + glow respirando).
+ *  4. WELCOME — "Bem-vindo(a)!"; na saída os materiais ACELERAM contra a
+ *               tela (escala + blur estourando) e o texto vem junto — o
+ *               mergulho para dentro da biblioteca.
+ *
+ * O túnel é DOM + GSAP ticker (sem WebGL): cada card tem um z virtual [0..1]
+ * que vira escala + afastamento radial + blur. Barato, e o mesmo modelo
+ * serve a saída (z disparado além do plano da tela).
  */
-const SPHERES: {
-  img: string;
-  stages: [number, number, number][]; // [left%, top%, widthVw]
-}[] = [
-  { img: "/spheres/s1.png", stages: [[24.51, 84.38, 12.5], [18.34, 93.38, 15.59], [16.43, 99.27, 17.72]] },
-  { img: "/spheres/s2.png", stages: [[81.01, 17.19, 11.46], [88.8, 9.58, 14.29], [96.52, 4.01, 16.25]] },
-  { img: "/spheres/s3.png", stages: [[91.46, 68.87, 13.19], [101.83, 74.04, 16.46], [111.34, 77.28, 18.71]] },
-  { img: "/spheres/s4.png", stages: [[26.7, 9.66, 6.32], [21.07, 0.2, 7.88], [19.53, -6.65, 8.96]] },
-  { img: "/spheres/s5.png", stages: [[5.69, 40.57, 14.72], [-5.13, 38.74, 18.36], [-10.26, 37.16, 20.87]] },
-  { img: "/spheres/s6.png", stages: [[73.09, 83.16, 11.04], [78.93, 91.86, 13.77], [85.3, 97.55, 15.66]] },
+
+/* As MESMAS esferas de material do túnel do site (public/products de lá):
+   é a "image 570" dos nós — bola de material em canvas quase cheio. */
+const PRODUCT_IMGS = Array.from(
+  { length: 10 },
+  (_, i) => `/products/product-${i + 1}.webp`,
+);
+
+/* Slots radiais: ângulo (graus, 0 = direita), distância base (% do menor
+   lado) e tamanho base (px @1440). Espalhados pelas bordas — o miolo é do
+   texto, como nos nós (produtos de 91 a 212px encostados nos cantos). */
+const SLOTS: { angle: number; dist: number; size: number; z0: number }[] = [
+  { angle: 208, dist: 34, size: 190, z0: 0.62 },
+  { angle: 24, dist: 38, size: 170, z0: 0.45 },
+  { angle: 336, dist: 36, size: 205, z0: 0.75 },
+  { angle: 155, dist: 40, size: 150, z0: 0.3 },
+  { angle: 262, dist: 38, size: 165, z0: 0.55 },
+  { angle: 82, dist: 40, size: 140, z0: 0.2 },
+  { angle: 118, dist: 44, size: 120, z0: 0.68 },
+  { angle: 296, dist: 46, size: 130, z0: 0.1 },
+  { angle: 45, dist: 50, size: 110, z0: 0.85 },
+  { angle: 190, dist: 52, size: 100, z0: 0.02 },
 ];
 
-// Vertical anchor (% of 864) + width (px) for the field in each state.
-const FIELD = {
-  hero: { top: 62.6, w: 680 },
-  docked: { top: 1.39, w: 880 },
+/* DOF: foco em z≈0.55; longe desfoca de leve, PERTO desfoca forte (é o
+   "depth of field nos que vão ficando mais próximos" do pedido). */
+const FOCUS_Z = 0.55;
+const RESPAWN_Z = 1.18;
+
+type CardSim = {
+  el: HTMLElement;
+  angle: number;
+  dist: number;
+  z: number;
+  speed: number;
 };
+
+function blurFor(z: number): number {
+  if (z > FOCUS_Z) return (z - FOCUS_Z) * 20;
+  return (FOCUS_Z - z) * 7;
+}
+
+function opacityFor(z: number): number {
+  const fadeIn = Math.min(1, z / 0.1);
+  const fadeOut = Math.min(1, Math.max(0, (RESPAWN_Z - z) / 0.14));
+  return Math.min(fadeIn, fadeOut);
+}
+
+/** Título quebrado por palavra — máscara + miolo, pro text-appear subir de
+ * dentro da linha com um resto de blur. */
+function Words({ text, className = "" }: { text: string; className?: string }) {
+  return (
+    <span className={`pb2-words ${className}`} aria-label={text}>
+      {text.split(" ").map((word, index) => (
+        <span key={`${word}-${index}`} className="pb2-w" aria-hidden>
+          <span className="pb2-wi">{word}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
 
 export function Splash({ onComplete }: { onComplete?: () => void } = {}) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const playedRef = useRef(false);
+  const simsRef = useRef<CardSim[]>([]);
+  const tickerRef = useRef<((time: number, dt: number) => void) | null>(null);
+  const leavingRef = useRef(false);
+  const [stage, setStage] = useState<"intro" | "choice">("intro");
   const doneRef = useRef(onComplete);
   doneRef.current = onComplete;
+
+  /* Um passo da simulação: z avança devagar em direção à câmera; passou do
+     plano da tela, renasce no fundo. Escala, afastamento radial, blur e
+     opacidade derivam todos do z. */
+  const applySim = useCallback((sim: CardSim) => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const minSide = Math.min(vw, vh);
+    const rad = (sim.angle * Math.PI) / 180;
+    const spread = sim.dist + sim.z * 34; // afasta do centro conforme aproxima
+    const x = Math.cos(rad) * ((spread / 100) * minSide) * (vw / minSide) * 0.72;
+    const y = Math.sin(rad) * ((spread / 100) * minSide) * 0.8;
+    const scale = 0.34 + sim.z * 1.18;
+    gsap.set(sim.el, {
+      x,
+      y,
+      scale,
+      opacity: opacityFor(sim.z),
+      filter: `blur(${blurFor(sim.z).toFixed(1)}px)`,
+      zIndex: Math.round(sim.z * 40),
+    });
+  }, []);
 
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    let ctx: gsap.Context | null = null;
+    const cardEls = gsap.utils.toArray<HTMLElement>(".pb2-card", root);
+    simsRef.current = cardEls.map((el, i) => ({
+      el,
+      angle: SLOTS[i].angle,
+      dist: SLOTS[i].dist,
+      z: SLOTS[i].z0,
+      speed: 0.028 + (i % 4) * 0.009, // deriva LENTA, cada um no seu passo
+    }));
 
-    const build = () => {
-      ctx?.revert();
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const sphereEls = gsap.utils.toArray<HTMLElement>(".pb-sphere", root);
+    const ctx = gsap.context(() => {
+      // Estado inicial do campo: invisível (a chapa amarela cobre tudo).
+      simsRef.current.forEach(applySim);
+      gsap.set(".pb2-field", { opacity: 0 });
+      /* Esconder as palavras AQUI, não no CSS: translateY(115%) na folha e
+         yPercent no tween são pistas diferentes — o tween "rodava" e a
+         palavra ficava presa embaixo, borrada. */
+      gsap.set(".pb2-wi", { yPercent: 115, filter: "blur(8px)" });
 
-      // Precompute each sphere's transform target per stage. Position is driven
-      // entirely by GPU transforms (x/y/scale) — never layout props — so the
-      // motion stays smooth. Scale pivots on the element centre, which keeps the
-      // sphere centred on its target point at any size.
-      const geom = SPHERES.map((s) => {
-        const baseD = (s.stages[0][2] / 100) * vw;
-        const pt = (st: [number, number, number]) => ({
-          x: (st[0] / 100) * vw - baseD / 2,
-          y: (st[1] / 100) * vh - baseD / 2,
-          scale: (st[2] / 100) * vw / baseD,
-        });
-        return { baseD, s: s.stages.map(pt) };
+      if (reduce) {
+        // Sem movimento: pula direto pra escolha, campo estático visível.
+        gsap.set(".pb2-logo-layer", { display: "none" });
+        gsap.set(".pb2-field", { opacity: 1 });
+        gsap.set(".pb2-stage-choice", { opacity: 1, pointerEvents: "auto" });
+        gsap.set(".pb2-stage-choice .pb2-wi", { yPercent: 0, filter: "none" });
+        gsap.set(".pb2-stage-choice .pb2-rise", { opacity: 1, y: 0 });
+        setStage("choice");
+        return;
+      }
+
+      const ticker = (_t: number, dtMs: number) => {
+        const dt = Math.min(dtMs, 64) / 1000;
+        for (const sim of simsRef.current) {
+          if (leavingRef.current) continue; // a saída assume os tweens
+          sim.z += sim.speed * dt;
+          if (sim.z >= RESPAWN_Z) sim.z -= RESPAWN_Z;
+          applySim(sim);
+        }
+      };
+      tickerRef.current = ticker;
+      gsap.ticker.add(ticker);
+
+      /* Text-appear FASEADO (pedido do Victor): cada bloco entra na sua vez,
+         palavra a palavra — nada de tela inteira de uma vez. */
+      const showWords = (
+        tl: gsap.core.Timeline,
+        scope: string,
+        at: gsap.Position,
+      ) => {
+        tl.to(
+          `${scope} .pb2-wi`,
+          {
+            yPercent: 0,
+            filter: "blur(0px)",
+            duration: 0.8,
+            stagger: 0.12,
+            ease: "power3.out",
+          },
+          at,
+        );
+      };
+
+      // ——— Timeline mestre até a tela de escolha ———
+      const tl = gsap.timeline();
+
+      // 1. LOGO: selo pequeno (nó 18902:63901) que CRESCE até o traço preto
+      //    engolir a tela (o nó 18902:63949 é o meio do caminho) — a origem
+      //    do scale fica DENTRO do traço, então quando ele cobre tudo o
+      //    corte pro fundo preto é invisível.
+      tl.set(".pb2-logo", { scale: 1, transformOrigin: "50% 12%" })
+        // pulso de presença do selo antes de crescer
+        .to(".pb2-logo", {
+          scale: 1.12,
+          duration: 0.5,
+          ease: "sine.inOut",
+          delay: 0.3,
+        })
+        .to(".pb2-logo", { scale: 1, duration: 0.4, ease: "sine.inOut" })
+        // o mergulho pra DENTRO do logo
+        .to(".pb2-logo", { scale: 60, duration: 1.25, ease: "power3.in" })
+        .addLabel("reveal", ">-0.02")
+        // a tela já está toda preta (o traço) — a chapa some sem ninguém ver
+        .set(".pb2-logo-layer", { display: "none" }, "reveal")
+        .to(
+          ".pb2-field",
+          { opacity: 1, duration: 0.9, ease: "power2.out" },
+          "reveal",
+        );
+
+      // 3. PREP: "Preparando sua experiência..." aparece e segura.
+      showWords(tl, ".pb2-stage-prep", "reveal+=0.35");
+      tl.to(
+        ".pb2-stage-prep .pb2-wi",
+        {
+          yPercent: -115,
+          filter: "blur(6px)",
+          duration: 0.55,
+          stagger: 0.045,
+          ease: "power2.in",
+        },
+        "+=1.5",
+      );
+
+      // 4. CHOICE em três fases: título → subtítulo → cards.
+      showWords(tl, ".pb2-stage-choice .pb2-title", "+=0.1");
+      showWords(tl, ".pb2-stage-choice .pb2-subtitle", "-=0.35");
+      tl.to(
+        ".pb2-stage-choice .pb2-rise",
+        { opacity: 1, y: 0, duration: 0.65, stagger: 0.16, ease: "power3.out" },
+        "-=0.2",
+      ).call(() => {
+        setStage("choice");
+        gsap.set(".pb2-stage-choice", { pointerEvents: "auto" });
       });
 
-      const heroY = (FIELD.hero.top / 100) * vh;
-      const dockedY = (FIELD.docked.top / 100) * vh;
-
-      ctx = gsap.context(() => {
-        // ---- static setup ----
-        sphereEls.forEach((el, i) => {
-          gsap.set(el, {
-            width: geom[i].baseD,
-            height: geom[i].baseD,
-            x: geom[i].s[0].x,
-            y: geom[i].s[0].y,
-            scale: geom[i].s[0].scale,
-          });
-        });
-        gsap.set([".pb-welcome", ".pb-search-heading"], { xPercent: -50, yPercent: -50 });
-        gsap.set(".pb-top-logo", { xPercent: -50 });
-        gsap.set(".pb-field-wrap", { y: heroY });
-
-        // ---- perpetual idle drift so nothing ever sits perfectly still ----
-        if (!reduce) {
-          gsap.utils.toArray<HTMLElement>(".pb-sphere-float", root).forEach((el, i) => {
-            const dir = i % 2 ? 1 : -1;
-            gsap.to(el, {
-              xPercent: dir * (5 + (i % 3) * 3),
-              yPercent: -dir * (6 + ((i + 1) % 3) * 4),
-              rotation: dir * 2,
-              duration: 4.5 + i * 0.6,
-              ease: "sine.inOut",
-              yoyo: true,
-              repeat: -1,
-            });
-          });
-        }
-
-        // ---- the sequence ----
-        const tl = gsap.timeline({
-          defaults: { ease: "power2.out" },
-          onComplete: () => {
-            playedRef.current = true;
-            doneRef.current?.();
-          },
-        });
-
-        // Stage 0 · Welcome reveal
-        tl.from(sphereEls, {
-          scale: (i: number) => geom[i].s[0].scale * 0.25,
-          opacity: 0,
-          duration: 0.85,
-          ease: "back.out(1.5)",
-          stagger: { each: 0.06, from: "random" },
-        }, 0)
-          .from(".pb-top-logo", { opacity: 0, y: -14, duration: 0.6 }, 0.2)
-          .from(".pb-welcome", { opacity: 0, y: 26, duration: 0.7 }, 0.45);
-
-        // Transition A · Welcome → Search hero
-        const tA = 2.2;
-        tl.to(".pb-welcome", { opacity: 0, y: -26, scale: 0.97, duration: 0.5, ease: "power2.in" }, tA);
-        sphereEls.forEach((el, i) => {
-          tl.to(el, { x: geom[i].s[1].x, y: geom[i].s[1].y, scale: geom[i].s[1].scale, duration: 1.35, ease: "power3.inOut" }, tA);
-        });
-        tl.fromTo(".pb-search-heading", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, tA + 0.3)
-          .fromTo(".pb-field-inner", { opacity: 0, y: 30, scale: 0.95 }, { opacity: 1, y: 0, scale: 1, duration: 0.75, ease: "back.out(1.3)" }, tA + 0.35)
-          .to(".pb-glow", { opacity: 0.9, duration: 1.2, ease: "power2.out" }, tA + 0.3);
-
-        // Transition B · Search hero → Docked. Everything else clears out —
-        // heading, logo, glow and the spheres dissolve outward — leaving only
-        // the docked search bar on black.
-        const tB = 4.35;
-        tl.to(".pb-search-heading", { opacity: 0, y: -30, duration: 0.5, ease: "power2.in" }, tB)
-          .to(".pb-top-logo", { opacity: 0, duration: 0.45 }, tB)
-          .to(".pb-glow", { opacity: 0, duration: 0.8, ease: "power2.in" }, tB)
-          .to(".pb-field-wrap", { y: dockedY, duration: 1.1, ease: "expo.inOut" }, tB)
-          .to(".pb-field-inner", { width: FIELD.docked.w, duration: 1.1, ease: "expo.inOut" }, tB);
-        sphereEls.forEach((el, i) => {
-          tl.to(el, { x: geom[i].s[2].x, y: geom[i].s[2].y, scale: geom[i].s[2].scale * 0.9, opacity: 0, duration: 1.1, ease: "power2.in" }, tB);
-        });
-
-        // On resize (after the intro has played) or reduced motion, skip to rest.
-        if (reduce || playedRef.current) tl.progress(1).pause();
-
-        if (process.env.NODE_ENV !== "production") {
-          (window as unknown as { __tl?: gsap.core.Timeline }).__tl = tl;
-        }
-      }, root);
-    };
-
-    build();
-
-    let rt: ReturnType<typeof setTimeout>;
-    const onResize = () => {
-      clearTimeout(rt);
-      rt = setTimeout(build, 180);
-    };
-    window.addEventListener("resize", onResize);
+      /* Mesmo truque do splash v1: em dev o timeline fica acessível pra
+         depuração/preview headless (rAF pausado não anda timeline). */
+      if (process.env.NODE_ENV !== "production") {
+        (window as unknown as { __pb2Tl?: gsap.core.Timeline }).__pb2Tl = tl;
+      }
+    }, root);
 
     return () => {
-      window.removeEventListener("resize", onResize);
-      clearTimeout(rt);
-      ctx?.revert();
+      if (tickerRef.current) gsap.ticker.remove(tickerRef.current);
+      ctx.revert();
     };
+  }, [applySim]);
+
+  /* Clique em qualquer card: escolha sai, Bem-vindo entra, e a SAÍDA — os
+     materiais aceleram CONTRA a tela e tudo mergulha pra dentro da home. */
+  const handleChoose = useCallback(() => {
+    const root = rootRef.current;
+    if (!root || leavingRef.current) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      doneRef.current?.();
+      return;
+    }
+
+    gsap.context(() => {
+      const tl = gsap.timeline({ onComplete: () => doneRef.current?.() });
+      if (process.env.NODE_ENV !== "production") {
+        (window as unknown as { __pb2ChooseTl?: gsap.core.Timeline }).__pb2ChooseTl = tl;
+      }
+
+      gsap.set(".pb2-stage-choice", { pointerEvents: "none" });
+      tl.to(".pb2-stage-choice .pb2-wi", {
+        yPercent: -115,
+        filter: "blur(6px)",
+        duration: 0.45,
+        stagger: 0.03,
+        ease: "power2.in",
+      })
+        .to(
+          ".pb2-stage-choice .pb2-rise",
+          { opacity: 0, y: 14, duration: 0.4, stagger: 0.05, ease: "power2.in" },
+          "<",
+        )
+        .to(
+          ".pb2-stage-welcome .pb2-wi",
+          {
+            yPercent: 0,
+            filter: "blur(0px)",
+            duration: 0.75,
+            stagger: 0.07,
+            ease: "power3.out",
+          },
+          "-=0.1",
+        )
+        .to(
+          ".pb2-stage-welcome .pb2-sub",
+          { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
+          "<0.2",
+        )
+        // segura o Bem-vindo na tela antes do mergulho
+        .addLabel("dive", "+=1.35");
+
+      // Materiais vindo NA TELA: além do plano, blur e escala estourando.
+      leavingRef.current = true;
+      simsRef.current.forEach((sim, i) => {
+        const rad = (sim.angle * Math.PI) / 180;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const minSide = Math.min(vw, vh);
+        const boost = sim.dist + 150;
+        tl.to(
+          sim.el,
+          {
+            x:
+              Math.cos(rad) * ((boost / 100) * minSide) * (vw / minSide) * 0.72,
+            y: Math.sin(rad) * ((boost / 100) * minSide) * 0.8,
+            scale: 3.6 + (i % 3) * 0.8,
+            opacity: 0,
+            filter: "blur(26px)",
+            duration: 0.85,
+            ease: "power3.in",
+          },
+          `dive+=${(i % 5) * 0.05}`,
+        );
+      });
+
+      // O texto mergulha junto: cresce em direção ao usuário e desfoca.
+      tl.to(
+        ".pb2-stage-welcome",
+        {
+          scale: 1.35,
+          opacity: 0,
+          filter: "blur(14px)",
+          duration: 0.7,
+          ease: "power3.in",
+        },
+        "dive+=0.1",
+      ).to(
+        ".pb2-root-bg",
+        { opacity: 0, duration: 0.5, ease: "power2.inOut" },
+        "dive+=0.45",
+      );
+    }, root);
   }, []);
 
   return (
-    <div ref={rootRef} className="pb-root relative h-[100dvh] w-full overflow-hidden bg-black">
-      {/* ---- Material spheres ---- */}
-      {SPHERES.map((s, i) => (
-        <div key={i} className="pb-sphere absolute left-0 top-0 z-0 will-change-transform">
-          <div className="pb-sphere-float h-full w-full will-change-transform">
-            <div
-              className="flex h-full w-full items-center justify-center rounded-[clamp(8px,1.1vw,22px)] p-[15%]"
-              style={{ background: "rgba(255,255,255,0.08)" }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={s.img}
-                alt=""
-                className="pointer-events-none h-full w-full object-cover"
-                draggable={false}
-              />
-            </div>
-          </div>
-        </div>
-      ))}
+    <div ref={rootRef} className="pb2-root fixed inset-0 overflow-hidden">
+      <div className="pb2-root-bg absolute inset-0 bg-black" />
 
-      {/* ---- Standalone top logo (welcome + hero) ---- */}
-      <div className="pb-top-logo absolute left-1/2 z-10" style={{ top: "7.87%" }}>
-        <Logo className="h-[32px] w-[27.749px] text-white" />
+      {/* Túnel de materiais (DOM, z virtual → escala/afastamento/DOF). */}
+      <div className="pb2-field absolute inset-0" aria-hidden>
+        {SLOTS.map((slot, i) => (
+          <div
+            key={i}
+            className="pb2-card absolute left-1/2 top-1/2"
+            style={{
+              width: `${slot.size}px`,
+              height: `${slot.size}px`,
+              marginLeft: `${-slot.size / 2}px`,
+              marginTop: `${-slot.size / 2}px`,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={PRODUCT_IMGS[i % PRODUCT_IMGS.length]} alt="" />
+          </div>
+        ))}
       </div>
 
-      {/* ---- Welcome heading ---- */}
-      <h1 className="pb-welcome absolute left-1/2 top-1/2 z-10 m-0 text-center font-semibold uppercase leading-[1.1] text-white [font-size:clamp(30px,4.44vw,64px)]">
-        Bem-vindo(a),<br />
-        Sua biblioteca está<br />
-        pronta!
-      </h1>
+      {/* PREP — nó 18819:27760 */}
+      <div className="pb2-stage pb2-stage-prep">
+        <h1 className="pb2-title">
+          <Words text="Preparando sua experiência..." />
+        </h1>
+      </div>
 
-      {/* ---- Search heading ---- */}
-      <h1 className="pb-search-heading absolute left-1/2 z-10 m-0 text-center font-semibold uppercase leading-[1.1] text-white opacity-0 [font-size:clamp(30px,4.44vw,64px)]" style={{ top: "43%" }}>
-        Busque em mais de<br />
-        22.000 materiais<br />
-        e produtos
-      </h1>
+      {/* CHOICE — nó 18819:27780 */}
+      <div
+        className="pb2-stage pb2-stage-choice"
+        style={{ pointerEvents: "none" }}
+      >
+        <div className="flex w-[392px] max-w-[calc(100vw-48px)] flex-col gap-[56px]">
+          <div className="flex flex-col gap-[8px]">
+            <h1 className="pb2-title">
+              <Words text="Vamos começar" />
+            </h1>
+            <p className="pb2-subtitle">
+              <Words text="Selecione como deseja entrar:" />
+            </p>
+          </div>
+          <div className="flex flex-col gap-[12px]">
+            {/* Primeiro acesso — o card com o efeito do produto SELECIONADO
+                da biblioteca: anel em degradê + glow que respira (o nó traz
+                o stroke em GRADIENT_LINEAR). */}
+            <button
+              type="button"
+              onClick={handleChoose}
+              disabled={stage !== "choice"}
+              className="pb2-option pb2-option-first pb2-rise"
+            >
+              <span className="pb2-option-icon" aria-hidden>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M8 3.3v9.4M3.3 8h9.4"
+                    stroke="#ffc400"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+              <span className="pb2-option-texts">
+                <span className="pb2-option-title">Primeiro acesso</span>
+                <span className="pb2-option-sub">Criar uma conta</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={handleChoose}
+              disabled={stage !== "choice"}
+              className="pb2-option pb2-rise"
+            >
+              <span className="pb2-option-icon" aria-hidden>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M6 3.5 10.5 8 6 12.5"
+                    stroke="#ffffff"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+              <span className="pb2-option-texts">
+                <span className="pb2-option-title">Já tenho conta</span>
+                <span className="pb2-option-sub">Entrar</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
 
-      {/* ---- Search field (+ animated glow), animates hero → docked ---- */}
-      <div className="pb-field-wrap absolute left-0 right-0 top-0 z-20 flex justify-center px-[16px]">
-        <div
-          className="pb-glow pointer-events-none absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-1/2 opacity-0"
-          style={{ width: "min(820px, 92vw)", height: "160px" }}
-        >
-          <div
-            className="pb-glow-inner h-full w-full"
-            style={{
-              background:
-                "radial-gradient(58% 140% at 16% 50%, rgba(236,172,80,0.42), transparent 64%), radial-gradient(50% 160% at 44% 55%, rgba(140,100,205,0.36), transparent 64%), radial-gradient(48% 160% at 70% 48%, rgba(100,135,225,0.32), transparent 64%), radial-gradient(45% 150% at 90% 52%, rgba(210,110,170,0.28), transparent 64%)",
-            }}
-          />
+      {/* WELCOME — nó 18819:27743 */}
+      <div className="pb2-stage pb2-stage-welcome">
+        <div className="flex w-[430px] max-w-[calc(100vw-48px)] flex-col items-center gap-[16px] text-center">
+          <h1 className="pb2-title">
+            <Words text="Bem-vindo(a)!" className="pb2-words-center" />
+          </h1>
+          <p className="pb2-subtitle pb2-sub">
+            A partir de agora, sua vida profissional nunca mais será a mesma.
+          </p>
         </div>
-        <div className="pb-field-inner relative z-10 opacity-0" style={{ width: FIELD.hero.w, maxWidth: "100%" }}>
-          <SearchBar />
-        </div>
+      </div>
+
+      {/* LOGO — nós 18902:63949 (gigante) → 18902:63901 (selo) */}
+      <div className="pb2-logo-layer absolute inset-0 z-[80] flex items-center justify-center bg-[#ffc400]">
+        <Logo className="pb2-logo h-[80px] w-[69px] text-black" />
       </div>
     </div>
   );

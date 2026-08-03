@@ -148,3 +148,184 @@ body {
     animation: none;
   }
 }
+
+/* ═══ Splash v2 (nós 18819/18902) ═══════════════════════════════════════ */
+
+/* Cards do túnel: moldura de vidro do nó (branco 8%, radius 16, respiro
+   interno) — o blur/escala/posição são todos do GSAP. */
+.pb2-card {
+  padding: 5.5%;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+.pb2-card {
+  overflow: hidden;
+}
+.pb2-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+  /* A esfera vive num canvas com ~15% de respiro: o zoom leve faz a bola
+     preencher o card, como a image 570 dos nós. */
+  transform: scale(1.45);
+}
+
+/* Palcos de texto: centralizados, um por vez. */
+.pb2-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pb2-title {
+  margin: 0;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 26px;
+}
+.pb2-subtitle {
+  margin: 0;
+  color: #d4d4d4;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 18px;
+}
+
+/* Text-appear: cada palavra sobe de dentro da própria linha (máscara) com um
+   resto de blur que resolve no fim. */
+.pb2-words {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.32em;
+  row-gap: 2px;
+}
+.pb2-words-center {
+  justify-content: center;
+}
+.pb2-w {
+  display: inline-block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+.pb2-wi {
+  display: inline-block;
+  /* O estado escondido (y 115% + blur) e do GSAP, nao daqui: CSS translateY
+     em % e yPercent do tween sao pistas diferentes e a palavra travava. */
+}
+
+/* Cards de escolha (nó 18819:27780: 392×78, vidro 8%, radius 16). */
+.pb2-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 78px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(18px);
+  transition: background 0.2s ease;
+}
+.pb2-option:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.pb2-option-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 80px;
+}
+.pb2-option-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pb2-option-title {
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 22px;
+}
+.pb2-option-sub {
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: rgba(255, 255, 255, 0.64);
+}
+
+/* "Primeiro acesso" = o efeito do card de produto SELECIONADO da
+   biblioteca: anel em degradê (duas pinturas — padding-box tapa o miolo,
+   border-box pinta a moldura) + glow amarelo respirando por opacity. */
+.pb2-option-first {
+  border: 1px solid transparent;
+  /* A camada de dentro precisa ser OPACA (o vidro 8% deixava o degradê da
+     moldura vazar e o card inteiro amarelava): 8% de branco sobre preto. */
+  background:
+    linear-gradient(#141414, #141414) padding-box,
+    linear-gradient(120deg, #ffc400, rgba(255, 196, 0, 0.2) 55%, rgba(255, 255, 255, 0.2))
+      border-box;
+}
+.pb2-option-first:hover {
+  background:
+    linear-gradient(#1d1d1d, #1d1d1d) padding-box,
+    linear-gradient(120deg, #ffc400, rgba(255, 196, 0, 0.26) 55%, rgba(255, 255, 255, 0.26))
+      border-box;
+}
+.pb2-option-first::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 16px;
+  pointer-events: none;
+  box-shadow: 0 0 22px rgba(255, 196, 0, 0.35), 0 0 6px rgba(255, 196, 0, 0.25);
+  animation: pb2-breathe 2.6s ease-in-out infinite;
+}
+@keyframes pb2-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Sub do Bem-vindo entra depois do título. */
+.pb2-sub {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pb2-option-first::after {
+    animation: none;
+  }
+  .pb2-wi {
+    transform: none;
+    filter: none;
+  }
+  .pb2-option {
+    opacity: 1;
+    transform: none;
+  }
+  .pb2-sub {
+    opacity: 1;
+    transform: none;
+  }
+}
