@@ -45,17 +45,24 @@ export function Experience() {
 
     const bridge = window as unknown as SketchupBridge;
     if (bridge.sketchup) {
-      /* Dentro do SketchUp: pergunta ao plugin, como a biblioteca real. */
+      /* Dentro do SketchUp: o mesmo initFirstAccessEarly da biblioteca real
+         (sketchupInit.ts) — receptor registrado ANTES de perguntar; plugin
+         antigo sem a ponte resolve "não" na hora; sem resposta, fail closed
+         no mesmo timeout de 5s do real. */
       bridge.getFirstAccess = (isFirst: boolean) => setFirstAccess(!!isFirst);
+      if (typeof bridge.sketchup.getFirstAccess !== "function") {
+        setFirstAccess(false);
+        return;
+      }
       try {
-        bridge.sketchup.getFirstAccess?.();
+        bridge.sketchup.getFirstAccess();
       } catch {
         setFirstAccess(false);
+        return;
       }
-      /* Plugin antigo / sem resposta: fail closed, direto pra biblioteca. */
       const timeout = window.setTimeout(() => {
         setFirstAccess((v) => (v === null ? false : v));
-      }, 1500);
+      }, 5000);
       return () => window.clearTimeout(timeout);
     }
 
